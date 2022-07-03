@@ -14,7 +14,7 @@ SUITE = project.SUITE_SATISFICING
 if project.TetralithEnvironment.is_present():
     #BENCHMARKS_DIR = os.environ["AUTOSCALE_BENCHMARKS_SAT"]
     #SUITE = project.SUITE_AUTOSCALE_SAT
-    ENV = project.TetralithEnvironment(email="jendrik.seipp@liu.se")
+    ENV = project.TetralithEnvironment(email="jendrik.seipp@liu.se", extra_options="#SBATCH --account=snic2022-5-341")
 else:
     SUITE = ["depot:p01.pddl", "gripper:prob01.pddl", "miconic:s1-0.pddl"]
     ENV = project.LocalEnvironment(processes=2)
@@ -155,6 +155,7 @@ project.add_absolute_report(
 
 attributes = ["cost"]
 pairs = [
+    ("lama", "lama-ae"),
 ]
 suffix = "-rel" if project.RELATIVE else ""
 for algo1, algo2 in pairs:
