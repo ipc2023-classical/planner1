@@ -34,6 +34,7 @@ class CommonParser(Parser):
 
 def main():
     parser = CommonParser()
+    parser.add_repeated_pattern("config_times", r"Actual search time: (.+)s", type=float)
     parser.parse()
 
 
