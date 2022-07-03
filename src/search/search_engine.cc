@@ -51,6 +51,8 @@ SearchEngine::SearchEngine(const Options &opts)
       successor_generator(get_successor_generator(task_proxy, log)),
       search_space(state_registry, log),
       statistics(log),
+      only_use_operators_from_incumbent_plan(
+          opts.get<bool>("only_use_operators_from_incumbent_plan")),
       cost_type(opts.get<OperatorCost>("cost_type")),
       is_unit_cost(task_properties::is_unit_cost(task_proxy)),
       max_time(opts.get<double>("max_time")) {
@@ -76,6 +78,13 @@ SearchStatus SearchEngine::get_status() const {
 const Plan &SearchEngine::get_plan() const {
     assert(solution_found);
     return plan;
+}
+
+void SearchEngine::set_incumbent_plan(const Plan &plan) {
+    operators_in_incumbent_plan = utils::make_unique_ptr<phmap::flat_hash_set<int>>();
+    for (OperatorID op_id : plan) {
+        operators_in_incumbent_plan->insert(op_id.get_index());
+    }
 }
 
 void SearchEngine::set_plan(const Plan &p) {
@@ -139,6 +148,10 @@ void SearchEngine::add_options_to_parser(OptionParser &parser) {
         "bound",
         "exclusive depth bound on g-values. Cutoffs are always performed according to "
         "the real cost, regardless of the cost_type parameter", "infinity");
+    parser.add_option<bool>(
+        "only_use_operators_from_incumbent_plan",
+        "only apply actions that appear in the current best plan",
+        "false");
     parser.add_option<double>(
         "max_time",
         "maximum time in seconds the search is allowed to run for. The "

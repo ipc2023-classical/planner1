@@ -66,6 +66,9 @@ SearchStatus IteratedSearch::step() {
     if (pass_bound) {
         current_search->set_bound(best_bound);
     }
+    if (solution_found) {
+        current_search->set_incumbent_plan(plan);
+    }
     ++phase;
 
     current_search->search();

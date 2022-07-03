@@ -68,11 +68,25 @@ vector<OperatorID> LazySearch::get_successor_operators(
     successor_generator.generate_applicable_ops(
         current_state, applicable_operators);
 
+    // If an incumbent plan is set, only keep the applicable operators that appear in it.
+    if (operators_in_incumbent_plan && only_use_operators_from_incumbent_plan) {
+        applicable_operators.erase(
+            remove_if(
+                applicable_operators.begin(), applicable_operators.end(),
+                [this](OperatorID op_id) {
+                    return !operators_in_incumbent_plan->contains(op_id.get_index());
+                }),
+            applicable_operators.end());
+    }
+
     if (randomize_successors) {
         rng->shuffle(applicable_operators);
     }
 
     if (preferred_successors_first) {
+        if (operators_in_incumbent_plan && only_use_operators_from_incumbent_plan) {
+            ABORT("preferred_successors_first=true is not supported when eliminating actions");
+        }
         ordered_set::OrderedSet<OperatorID> successor_operators;
         for (OperatorID op_id : preferred_operators) {
             successor_operators.insert(op_id);

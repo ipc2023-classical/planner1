@@ -175,6 +175,17 @@ SearchStatus EagerSearch::step() {
     vector<OperatorID> applicable_ops;
     successor_generator.generate_applicable_ops(s, applicable_ops);
 
+    // If an incumbent plan is set, only keep the applicable operators that appear in it.
+    if (operators_in_incumbent_plan && only_use_operators_from_incumbent_plan) {
+        applicable_ops.erase(
+            remove_if(
+                applicable_ops.begin(), applicable_ops.end(),
+                [this](OperatorID op_id) {
+                    return !operators_in_incumbent_plan->contains(op_id.get_index());
+                }),
+            applicable_ops.end());
+    }
+
     /*
       TODO: When preferred operators are in use, a preferred operator will be
       considered by the preferred operator queues even when it is pruned.
