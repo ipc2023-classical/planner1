@@ -17,6 +17,7 @@ from sas_parser import parse_task
 from simplify import filter_unreachable_propositions
 from variable_order import find_and_apply_variable_order
 import argparse
+import os
 
 MR  = 'MR'
 MLR = 'MLR'
@@ -103,7 +104,7 @@ def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
                 current_val_names.append(variables.value_names[var][val])
                 next_val += 1
         # Code to create default 'Some value not in any precond' value of variable
-        current_val_names.append('Atom some-value')
+        current_val_names.append('Atom irrelevant-fact()')
         next_val += 1
         # End code for some value not in any precond
         new_ranges.append(next_val)
@@ -114,7 +115,7 @@ def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
     if ordered:
         new_ranges.append(len(plan) + 1)
         new_axiom_layers.append(-1)
-        new_value_names.append(['Atom plan-pos(%i)' % i for i in range(len(plan) + 1)])
+        new_value_names.append(['Atom plan-pos-%i()' % i for i in range(len(plan) + 1)])
         vars_new_vals_map.append([i for i in range(len(plan) + 1)])
     
     return SASVariables(ranges=new_ranges, axiom_layers=new_axiom_layers, value_names=new_value_names)\
@@ -147,7 +148,7 @@ def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ord
         if ordered:
             new_pre_post.append((ordered_var, op_index, op_index + 1, []))
             # We are assuming the input domain does not have action 'skip-action'. Should we think of a better name for this action?
-            processed_operators.append(SASOperator(name='(skip-action(%i))' % op_index, prevail=[], pre_post=[(ordered_var, op_index, op_index + 1, [])], cost=0))
+            processed_operators.append(SASOperator(name='(skip-action plan-pos-%i)' % op_index, prevail=[], pre_post=[(ordered_var, op_index, op_index + 1, [])], cost=0))
 
         processed_operators.append(SASOperator(name=op.name, prevail=new_prev, pre_post=new_pre_post, cost=op.cost if not ordered or costs_task else 1))
 
@@ -186,16 +187,22 @@ def map_goal_vals(goal, vars_vals_map):
     return SASGoal(pairs=[(var, vars_vals_map[var][val]) for var, val in goal.pairs])
 
 def main():
-    '''
+    help_string = '''
     Creates an action elimination domain for an automated planning task and a valid plan.
-    Currently reduction will always be MR, will include MLR in the future. 
+    Currently reduction will always be MR, will include MLR in the future.
+    Examples: <param> is a nec. parameter, while [param=val] is an optional parameter with default value = val
+    Maintain order of actions in original plan call string: 
+        ./action_elim.py  -t <output.sas> -p <sas_plan> -s -r [reduction=MR] -f [file=reformulation.sas] -d [directory=.]
+    Allow reorder of actions in original plan call string: 
+        ./action_elim.py  -t <output.sas> -p <sas_plan> -r [reduction=MR] -f [file=reformulation.sas] -d [directory=.]
     '''
-    parser = argparse.ArgumentParser(description='Creates an action elimination domain for an automated planning task and a valid plan.')
-    parser.add_argument('-t', '--task', help='Path to task file in SAS+ format.',type=str)
-    parser.add_argument('-p', '--plan', help='Path to plan file.', type=str)
-    parser.add_argument('-s', '--subsequence', help='Compiled task must guarantee maintaing order of original actions', type=bool, default=False)
+    parser = argparse.ArgumentParser(description=help_string,formatter_class=argparse.RawTextHelpFormatter)
+    required_named = parser.add_argument_group('required named arguments')
+    required_named.add_argument('-t', '--task', help='Path to task file in SAS+ format.',type=str, required=True)
+    required_named.add_argument('-p', '--plan', help='Path to plan file.', type=str, required=True)
+    parser.add_argument('-s', '--subsequence', help='Compiled task must guarantee maintaing order of original actions', action='store_true', default=False)
     parser.add_argument('-r', '--reduction', help='MR or MLR. MR=minimal reduction, MLR=minimal length reduction',type=str, default=MR)
-    parser.add_argument('-f', '--file', help='Output file',type=str,default='')
+    parser.add_argument('-f', '--file', help='Output file where reformulated SAS+ will be stored',type=str,default='minimal-reduction.sas')
     parser.add_argument('-d', '--directory', help='Output directory',type=str, default='.')
     options = parser.parse_args()
     
@@ -205,9 +212,9 @@ def main():
 
     task, operator_name_to_index_map = parse_task(options.task)
     plan_size, plan, plan_cost = parse_plan(options.plan)
-    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, True)
+    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence)
     
-    with open('salida.txt', mode='w') as output_file:
+    with open(os.path.join(options.directory, options.file), mode='w') as output_file:
         new_task.output(stream=output_file)
     
 if __name__ == '__main__':
