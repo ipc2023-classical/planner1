@@ -10,7 +10,6 @@
 #
 #######################################################################
 
-from numpy import var
 from sas_tasks import SASTask, SASVariables, SASOperator, SASInit, SASGoal, SASAxiom, SASMutexGroup
 from plan_parser import parse_plan
 from sas_parser import parse_task
@@ -23,9 +22,13 @@ MR  = 'MR'
 MLR = 'MLR'
 
 # Clean domains as proposed by Jendrik (I think)
-def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered=False):
+def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered=False, enhanced=False):
     # Process operators. Later on, variable to maintain order of actions will be var_(n + 1) (n=num vars originally)
-    new_operators = get_operators_from_plan(sas_task.operators, plan, operator_name_to_index, ordered=True)
+    new_operators = get_operators_from_plan(sas_task.operators, plan, operator_name_to_index, ordered)
+    triv_nec = [False]* len(plan)
+    if ordered and enhanced:
+        # Find triv. neccessary actions. Operators have same order as original plan!
+        triv_nec = find_triv_nec_actions(sas_task.init, sas_task.goal, sas_task.variables, new_operators)
 
     # Find relevant facts for action elim task
     relevant_facts = find_relevant_facts(sas_task, plan, operator_name_to_index)
@@ -33,8 +36,13 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered=Fals
     # Prune domains of variables to only contain relevant facts
     new_variables, vars_vals_map = prune_irrelevant_domain_values(sas_task.variables, relevant_facts, plan, ordered)
 
+    # TODO: should we 'rename' operators when including the orderded varaible?
+    # example: (action x y z ordering-variable)
+    # Since we are not renaming, when calling the reformulation for an already reformulated task,
+    # we get operators with the exact same name but differect preconditions, which eventually leads to an exception.
+    # Should we look into this, or assume no one is going to call the reformulation with a task/plan obtained from the reformulation?
     # Map operators variable values to new domains
-    new_operators = process_operators(new_operators, relevant_facts, vars_vals_map, new_variables, ordered, sas_task.metric)
+    new_operators = process_operators(new_operators, relevant_facts, vars_vals_map, new_variables, ordered, sas_task.metric, triv_nec)
 
     # Map init values to new domains
     new_init = process_init(sas_task.init, vars_vals_map, relevant_facts, new_variables, ordered)
@@ -57,7 +65,7 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered=Fals
 
     return new_task
 
-def get_operators_from_plan(operators, plan, operator_name_to_index, ordered=False):
+def get_operators_from_plan(operators, plan, operator_name_to_index, ordered):
     return [operators[operator_name_to_index[op]] for op in plan]
 
 def find_relevant_facts(sas_task, operators, operator_name_to_index):
@@ -121,7 +129,7 @@ def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
     return SASVariables(ranges=new_ranges, axiom_layers=new_axiom_layers, value_names=new_value_names)\
            , vars_new_vals_map
 
-def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ordered, costs_task):
+def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ordered, costs_task, triv_nec=-1):
     processed_operators = list()
     # Variable to maintain order is ALWAYS the last variable
     ordered_var = len(variables.ranges) - 1
@@ -147,8 +155,10 @@ def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ord
         # Add ordered constraint pre_post
         if ordered:
             new_pre_post.append((ordered_var, op_index, op_index + 1, []))
-            # We are assuming the input domain does not have action 'skip-action'. Should we think of a better name for this action?
-            processed_operators.append(SASOperator(name='(skip-action plan-pos-%i)' % op_index, prevail=[], pre_post=[(ordered_var, op_index, op_index + 1, [])], cost=0))
+            # Only actions that are not triv. nec can be skipped
+            if not triv_nec[op_index]:
+                # We are assuming the input domain does not have action 'skip-action'. Should we think of a better name for this action?
+                processed_operators.append(SASOperator(name='(skip-action plan-pos-%i)' % op_index, prevail=[], pre_post=[(ordered_var, op_index, op_index + 1, [])], cost=0))
 
         processed_operators.append(SASOperator(name=op.name, prevail=new_prev, pre_post=new_pre_post, cost=op.cost if not ordered or costs_task else 1))
 
@@ -186,13 +196,60 @@ def process_axioms(axioms):
 def map_goal_vals(goal, vars_vals_map):
     return SASGoal(pairs=[(var, vars_vals_map[var][val]) for var, val in goal.pairs])
 
+# Finds trivially necessary actions
+def find_triv_nec_actions(init, goal, variables, plan):
+    # Find achievers for each fact
+    fact_achievers = [[[] for _ in range(dom_size)] for dom_size in variables.ranges]
+
+    # Facts achieved by the initial state
+    for var, val in enumerate(init.values):
+        fact_achievers[var][val].append(-1)
+
+    # For each operator what facts they achieve
+    for index, op in enumerate(plan):
+        for var, _, new_val, _  in op.pre_post:
+            fact_achievers[var][new_val].append(index)
+    
+    # Add virtual goal action. prevail is goal conditions, used for ease of implementation
+    virtual_goal_action = SASOperator(name='virtual_goal', prevail=[(var, val) for var, val in goal.pairs], pre_post=[], cost=0)
+    # Copy the operators
+    extended_plan = plan[:]
+    extended_plan.append(virtual_goal_action)
+    triv_nec = [False for _ in extended_plan]
+    triv_nec[-1] = True
+
+    # Check, in reverse order, for trivially nec actions
+    for op_index in range(len(extended_plan) - 1, -1, -1):
+        # If current act is triv. nec, its' preconds are nec.
+        if triv_nec[op_index]:
+            current_op = extended_plan[op_index]
+            for var, val in current_op.prevail:
+                # If one pre has only one achiever that is not the initial state, that achiever is nec!
+                
+                if sum(1 for achiever in fact_achievers[var][val] if achiever < op_index) < 2:
+                    if fact_achievers[var][val][0] > -1:
+                        triv_nec[fact_achievers[var][val][0]] = True
+            
+            for var, val, _, _ in current_op.pre_post:
+                # If one pre has only one achiever that is not the initial state, that achiever is nec!
+                if val > -1 and sum(1 for achiever in fact_achievers[var][val] if achiever < op_index) < 2:
+                    if fact_achievers[var][val][0] > -1:
+                       triv_nec[fact_achievers[var][val][0]] = True
+
+    # TODO This can be done iteratively to identify more nec. actions
+    # Once you identify a triv. nec action you can delete achievers from the list.
+    # If one action with index i is nec, and changes the value of a variable, all achievers 
+    # of a value for that variable are no longer achievers for indices > i
+    # What's the worst case complexity? Is it worth it?
+    return triv_nec
+
 def main():
     help_string = '''
     Creates an action elimination domain for an automated planning task and a valid plan.
     Currently reduction will always be MR, will include MLR in the future.
     Examples: <param> is a nec. parameter, while [param=val] is an optional parameter with default value = val
-    Maintain order of actions in original plan call string: 
-        ./action_elim.py  -t <output.sas> -p <sas_plan> -s -r [reduction=MR] -f [file=reformulation.sas] -d [directory=.]
+    Maintain order of actions and compute triv. nec actions in original plan call string: 
+        ./action_elim.py  -t <output.sas> -p <sas_plan> -s -e -r [reduction=MR] -f [file=reformulation.sas] -d [directory=.]
     Allow reorder of actions in original plan call string: 
         ./action_elim.py  -t <output.sas> -p <sas_plan> -r [reduction=MR] -f [file=reformulation.sas] -d [directory=.]
     '''
@@ -201,6 +258,7 @@ def main():
     required_named.add_argument('-t', '--task', help='Path to task file in SAS+ format.',type=str, required=True)
     required_named.add_argument('-p', '--plan', help='Path to plan file.', type=str, required=True)
     parser.add_argument('-s', '--subsequence', help='Compiled task must guarantee maintaing order of original actions', action='store_true', default=False)
+    parser.add_argument('-e', '--enhanced', help='Compiled task only creates skip actions for skippable actions', action='store_true', default=False)
     parser.add_argument('-r', '--reduction', help='MR or MLR. MR=minimal reduction, MLR=minimal length reduction',type=str, default=MR)
     parser.add_argument('-f', '--file', help='Output file where reformulated SAS+ will be stored',type=str,default='minimal-reduction.sas')
     parser.add_argument('-d', '--directory', help='Output directory',type=str, default='.')
@@ -212,7 +270,7 @@ def main():
 
     task, operator_name_to_index_map = parse_task(options.task)
     plan_size, plan, plan_cost = parse_plan(options.plan)
-    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence)
+    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, options.enhanced)
     
     with open(os.path.join(options.directory, options.file), mode='w') as output_file:
         new_task.output(stream=output_file)
