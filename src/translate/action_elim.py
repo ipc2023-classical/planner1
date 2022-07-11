@@ -98,14 +98,14 @@ def find_relevant_facts(sas_task, operators, operator_name_to_index):
 def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
     # For each var, store value mapping to new domain
     vars_new_vals_map = [[-1] * domain_size for domain_size in variables.ranges]
-    new_value_names = list()
-    new_axiom_layers = list()
-    new_ranges = list()
+    new_value_names = []
+    new_axiom_layers = []
+    new_ranges = []
 
     # For each relevant fact, add to new domain
     for var, rel_facts in enumerate(is_fact_relevant[:-1]):
         next_val = 0
-        current_val_names = list()
+        current_val_names = []
         for val, is_rel in enumerate(rel_facts):
             if is_rel:
                 vars_new_vals_map[var][val] = next_val
@@ -130,7 +130,7 @@ def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
            , vars_new_vals_map
 
 def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ordered, costs_task, triv_nec=-1):
-    processed_operators = list()
+    processed_operators = []
     # Variable to maintain order is ALWAYS the last variable
     ordered_var = len(variables.ranges) - 1
     for op_index, op in enumerate(operators):
@@ -141,12 +141,12 @@ def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ord
                         for var, old_val, new_val, cond in op.pre_post]
 
         # Readable code. Should do the same as the list comprehension. I-ll leave it here so we can choose
-        #readable_new_prev = list()
+        #readable_new_prev = []
         #for var, val in op.prevail:
         #    if is_fact_relevant[var][val]:
         #        readable_new_prev.append((var, vars_vals_map[var][val]))
         #
-        #readable_pre_post = list()
+        #readable_pre_post = []
         #for var, old_val, new_val, cond in op.pre_post:
         #    mapped_old = -1 if old_val == -1 else vars_vals_map[var][old_val]
         #    mapped_new = vars_vals_map[var][new_val] if is_fact_relevant[var][new_val] else variables.ranges[var] - 1
@@ -165,7 +165,7 @@ def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ord
     return processed_operators
 
 def process_init(init, vars_val_map, is_fact_relevant, variables, ordered):
-    new_init_values = list()
+    new_init_values = []
     for var, val in enumerate(init.values):
         # If fact is relevant add to init. Else add 'some value'
         if is_fact_relevant[var][val]:
@@ -180,7 +180,7 @@ def process_init(init, vars_val_map, is_fact_relevant, variables, ordered):
     return SASInit(values=new_init_values)
 
 def process_mutex_groups(mutex_groups, vars_val_map, is_fact_relevant):
-    new_groups = list()
+    new_groups = []
     for group in mutex_groups:
         new_mutex = [(var, vars_val_map[var][val]) for var, val in group.facts if is_fact_relevant[var][val]]
         if len(new_mutex) > 1:
@@ -190,7 +190,7 @@ def process_mutex_groups(mutex_groups, vars_val_map, is_fact_relevant):
 
 def process_axioms(axioms):
     # TODO use axioms!
-    return list()
+    return []
 
 # One liner without multiple uses. Might refactor
 def map_goal_vals(goal, vars_vals_map):
@@ -220,7 +220,7 @@ def find_triv_nec_actions(init, goal, variables, plan):
 
     # Check, in reverse order, for trivially nec actions
     for op_index in range(len(extended_plan) - 1, -1, -1):
-        # If current act is triv. nec, its' preconds are nec.
+        # If current act is triv. nec, its' preconds are nec.domain
         if triv_nec[op_index]:
             current_op = extended_plan[op_index]
             for var, val in current_op.prevail:
@@ -245,7 +245,7 @@ def find_triv_nec_actions(init, goal, variables, plan):
 
 def main():
     help_string = '''
-    Creates an action elimination domain for an automated planning task and a valid plan.
+    Creates an action elimination task for an automated planning task and a valid plan.
     Currently reduction will always be MR, will include MLR in the future.
     Examples: <param> is a nec. parameter, while [param=val] is an optional parameter with default value = val
     Maintain order of actions and compute triv. nec actions in original plan call string: 

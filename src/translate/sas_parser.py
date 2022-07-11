@@ -10,172 +10,176 @@
 #
 #######################################################################
 
-from asyncio.subprocess import STDOUT
-import sys
-import os
-
-from yaml import parse
+import sys, os
 from sas_tasks import SASTask, SASVariables, SASOperator, SASInit, SASGoal, SASAxiom, SASMutexGroup
-from plan_parser import parse_plan
-
-MR  = 'MR'
-MLR = 'MLR'
+import filecmp
 
 def parse_task(task_file):
-    variables = list()
-    domains = list()
-    mutex_groups = list()
-    init_values = list()
-    goal_values = list()
-    operators = list()
-    axiom_layers = list()
-    axioms = list()
-    current_line = str()
-    ranges = list()
-    operator_index = 0
-    operator_name_to_index = dict()
-    fact_name_to_var_val = dict()
+    variables = []
+    domains = []
+    mutex_groups = []
+    init_values = []
+    goal_values = []
+    operators = []
+    axiom_layers = []
+    axioms = []
+    current_line = ""
+    ranges = []
+    operator_name_to_index = {}
 
-    try:
-        with open(task_file, 'r') as sas_task:
-            # Read version
-            current_line = sas_task.readline().strip()
-            assert(current_line == 'begin_version')
-            version = int(sas_task.readline().strip())
-            if version != 3: sys.exit("Only version 3 supported.")
-            current_line = sas_task.readline().strip()
-            assert(current_line == 'end_version')
+    def get_next_line(): 
+        return sas_task.readline().strip()
 
-            # Check metric
-            current_line = sas_task.readline().strip()
-            assert(current_line == 'begin_metric')
-            metric = sas_task.readline().strip() != '0'
-            current_line = sas_task.readline().strip()
-            assert(current_line == 'end_metric')
+    def get_next_int():
+        return int(get_next_line())
 
-            # Read variables
-            num_vars = int(sas_task.readline().strip())
-            for _ in range(num_vars):
-                current_line = sas_task.readline().strip()
-                assert(current_line == 'begin_variable')
+    def get_next_int_pair():
+        p1, p2 = get_next_line().split()
+        return int(p1), int(p2)
 
-                # Name and axiom
-                var_name = sas_task.readline().strip()
-                axiom_layer =  int(sas_task.readline().strip())
+    with open(task_file, 'r') as sas_task:
+        # Read version
+        current_line = get_next_line()
+        assert(current_line == 'begin_version')
+        version = get_next_int()
+        if version != 3: 
+            sys.exit("Only version 3 supported.")
+        current_line = get_next_line()
+        assert(current_line == 'end_version')
 
-                # Domain
-                dom_size = int(sas_task.readline().strip())
-                ranges.append(dom_size)
-                domain_vals = list()
-                for _ in range(dom_size): domain_vals.append(sas_task.readline().strip())
+        # Check metric
+        current_line = get_next_line()
+        assert(current_line == 'begin_metric')
+        metric = get_next_line() != '0'
+        current_line = get_next_line()
+        assert(current_line == 'end_metric')
 
-                current_line = sas_task.readline().strip()
-                assert(current_line == 'end_variable')
+        # Read variables
+        num_vars = get_next_int()
+        for _ in range(num_vars):
+            current_line = get_next_line()
+            assert(current_line == 'begin_variable')
 
-                # Store var info
-                variables.append(var_name)
-                axiom_layers.append(axiom_layer)
-                domains.append(domain_vals)
+            # Name and axiom
+            var_name = get_next_line()
+            axiom_layer =  get_next_int()
+
+            # Domain
+            dom_size = get_next_int()
+            ranges.append(dom_size)
+            domain_vals = []
+            for _ in range(dom_size): 
+                domain_vals.append(get_next_line())
+
+            current_line = get_next_line()
+            assert(current_line == 'end_variable')
+
+            # Store var info
+            variables.append(var_name)
+            axiom_layers.append(axiom_layer)
+            domains.append(domain_vals)
+        
+        variables = SASVariables(ranges=ranges, axiom_layers=axiom_layers,value_names=domains)
+        # Read mutex groups
+        num_mutex_groups = get_next_int()
+        for _ in range(num_mutex_groups):
+            current_line = get_next_line()
+            assert(current_line == 'begin_mutex_group')
+            current_group = []
+            facts_in_group = get_next_int()
+            for _ in range(facts_in_group):
+                var, fact = get_next_int_pair()
+                current_group.append((int(var), int(fact)))
+
+            current_line = get_next_line()
+            assert(current_line == 'end_mutex_group')
+            mutex_groups.append(SASMutexGroup(facts=current_group))
+
+        # Read initial state
+        current_line = get_next_line()
+        assert(current_line == 'begin_state')
+        
+        for _ in range(num_vars):
+            # Not going to check for domain of each variable, assume input sas is valid
+            init_values.append(get_next_int())
+        init_state = SASInit(init_values)
+        
+        current_line = get_next_line()
+        assert(current_line == 'end_state')
+
+        # Read goal
+        current_line = get_next_line()
+        assert(current_line == 'begin_goal')
+
+        num_goals = get_next_int()
+        for _ in range(num_goals):
+            var, val = get_next_int_pair()
+            goal_values.append((var,val))
+        
+        goal = SASGoal(pairs=goal_values)
+
+        current_line = get_next_line()
+        assert(current_line == 'end_goal')
+
+        # Read operators
+        num_operators = get_next_int()
+        for operator_index in range(num_operators):
+            current_line = get_next_line()
+            assert(current_line == 'begin_operator')
+
+            # Name and prevail conditions               
+            operator_name = '(%s)' % get_next_line()
+            prevail_cond = []
+            num_prevail_cond = get_next_int()
+            for _ in range(num_prevail_cond):
+                var, val = get_next_int_pair()
+                prevail_cond.append((var,val))
+
+            # Effects
+            effects = []
+            num_effects = get_next_int()
+            for _ in range(num_effects):
+                num_cond_effects, var_number, old_val, new_val = sas_task.readline().strip().split()
+                if int(num_cond_effects) > 0:
+                    sys.exit("Conditional effects not supported.")
+                effects.append((int(var_number), int(old_val), int(new_val), []))
+
+            cost = get_next_int()
+            current_line = get_next_line()
+            assert(current_line == 'end_operator')
+
+            # Create operator with empty prev, pre_post. Done to maintain orignal SAS+ task variable order
+            operators.append(SASOperator(name=operator_name, prevail=[], pre_post=[], cost=cost))
+            operators[-1].prevail = prevail_cond
+            operators[-1].pre_post = effects
+            operator_name_to_index[operator_name] = operator_index
+
+        # Axioms...
+        num_axioms = get_next_int()
+        for _ in range(num_axioms):
+            current_line = get_next_line()
+            assert(current_line == 'begin_rule')
+
+            num_cond = get_next_int()
+            conditions = []
+            for _ in range(num_cond):
+                var, val = get_next_int_pair()
+                conditions.append(var, val)
             
-            variables = SASVariables(ranges=ranges, axiom_layers=axiom_layers,value_names=domains)
-            # Read mutex groups
-            num_mutex_groups = int(sas_task.readline().strip())
-            for _ in range(num_mutex_groups):
-                current_line = sas_task.readline().strip()
-                assert(current_line == 'begin_mutex_group')
-                current_group = list()
-                facts_in_group = int(sas_task.readline().strip())
-                for _ in range(facts_in_group):
-                    var, fact = sas_task.readline().strip().split()
-                    current_group.append((int(var), int(fact)))
+            var, old_val, new_val = sas_task.readline().strip().split()
+            effect = (int(var), int(old_val), int(new_val))
 
-                current_line = sas_task.readline().strip()
-                assert(current_line == 'end_mutex_group')
-                mutex_groups.append(SASMutexGroup(facts=current_group))
+            current_line = get_next_line()
+            assert(current_line == 'end_rule')
 
-            # Read initial state
-            current_line = sas_task.readline().strip()
-            assert(current_line == 'begin_state')
-            
-            for _ in range(num_vars):
-                # Not going to check for domain of each variable, assume input sas is valid
-                init_values.append(int(sas_task.readline().strip()))
-            init_state = SASInit(init_values)
-            
-            current_line = sas_task.readline().strip()
-            assert(current_line == 'end_state')
+            axioms.append(SASAxiom(condition=conditions, effect=effect))
 
-            # Read goal
-            current_line = sas_task.readline().strip()
-            assert(current_line == 'begin_goal')
-
-            num_goals = int(sas_task.readline().strip())
-            for _ in range(num_goals):
-                var, val = sas_task.readline().strip().split()
-                goal_values.append((int(var), int(val)))
-            
-            goal = SASGoal(pairs=goal_values)
-
-            current_line = sas_task.readline().strip()
-            assert(current_line == 'end_goal')
-
-            # Read operators
-            num_operators = int(sas_task.readline().strip())
-            for _ in range(num_operators):
-                current_line = sas_task.readline().strip()
-                assert(current_line == 'begin_operator')
-
-                # Name and prevail conditions               
-                operator_name = '(%s)' % sas_task.readline().strip()
-                prevail_cond = list()
-                num_prevail_cond = int(sas_task.readline().strip())
-                for _ in range(num_prevail_cond):
-                    var, val = sas_task.readline().strip().split()
-                    prevail_cond.append((int(var), int(val)))
-
-                # Effects
-                effects = list()
-                num_effects = int(sas_task.readline().strip())
-                for _ in range(num_effects):
-                    num_cond_effects, var_number, old_val, new_val = sas_task.readline().strip().split()
-                    if int(num_cond_effects) > 0:
-                        sys.exit("Conditional effects not supported.")
-                    effects.append((int(var_number), int(old_val), int(new_val), []))
-
-                cost = int(sas_task.readline().strip())
-                current_line = sas_task.readline().strip()
-                assert(current_line == 'end_operator')
-
-                # Create operator with empty prev, pre_post. Done to maintain orignal SAS+ task variable order
-                operators.append(SASOperator(name=operator_name, prevail=[], pre_post=[], cost=cost))
-                operators[-1].prevail = prevail_cond
-                operators[-1].pre_post = effects
-                operator_name_to_index[operator_name] = operator_index
-                operator_index += 1
-
-            # Axioms...
-            num_axioms = int(sas_task.readline().strip())
-            for _ in range(num_axioms):
-                current_line = sas_task.readline().strip()
-                assert(current_line == 'begin_rule')
-
-                num_cond = int(sas_task.readline().strip())
-                conditions = list()
-                conditions = list()
-                for _ in range(num_cond):
-                    var, val = sas_task.readline().strip().split()
-                    conditions.append(int(var), int(val))
-                
-                var, old_val, new_val = sas_task.readline().strip().split()
-                effect = (int(var), int(old_val), int(new_val))
-
-                current_line = sas_task.readline().strip()
-                assert(current_line == 'end_rule')
-
-                axioms.append(SASAxiom(condition=conditions, effect=effect))
-
-    except Exception as e:
-        print("Something went wrong!", e)
-        exit(-1)
+    # Verify that the read task is equal to original file
+    task = SASTask(variables=variables, mutexes=mutex_groups, init=init_state, goal=goal, operators=operators, axioms=axioms, metric=metric)
+    verify_file = task_file + ".verify-contents.sas"
+    with open(verify_file, mode='w') as output_file:
+        task.output(stream=output_file)
+    assert filecmp.cmp(task_file, verify_file), "Read task is not equal to input task."
+    os.remove(verify_file)
 
     return SASTask(variables=variables, mutexes=mutex_groups, init=init_state, goal=goal, operators=operators, axioms=axioms, metric=metric), operator_name_to_index
