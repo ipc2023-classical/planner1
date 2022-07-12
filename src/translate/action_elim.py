@@ -22,7 +22,7 @@ MR  = 'MR'
 MLR = 'MLR'
 
 # Clean domains as proposed by Jendrik (I think)
-def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered=False, enhanced=False):
+def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction):
     # Process operators. Later on, variable to maintain order of actions will be var_(n + 1) (n=num vars originally)
     new_operators = get_operators_from_plan(sas_task.operators, plan, operator_name_to_index, ordered)
     triv_nec = [False]* len(plan)
@@ -36,13 +36,17 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered=Fals
     # Prune domains of variables to only contain relevant facts
     new_variables, vars_vals_map = prune_irrelevant_domain_values(sas_task.variables, relevant_facts, plan, ordered)
 
-    # TODO: should we 'rename' operators when including the orderded varaible?
+    # We need action costs to maintain order of operators or if we want minimal reduction
+    # For MLR we do not need costs if permutations are allowed 
+    new_metric = ordered or (reduction == MR and sas_task.metric)
+
+    # TODO: should we 'rename' operators when including the order variable?
     # example: (action x y z ordering-variable)
     # Since we are not renaming, when calling the reformulation for an already reformulated task,
     # we get operators with the exact same name but differect preconditions, which eventually leads to an exception.
     # Should we look into this, or assume no one is going to call the reformulation with a task/plan obtained from the reformulation?
     # Map operators variable values to new domains
-    new_operators = process_operators(new_operators, relevant_facts, vars_vals_map, new_variables, ordered, sas_task.metric, triv_nec)
+    new_operators = process_operators(new_operators, relevant_facts, vars_vals_map, new_variables, ordered, new_metric, triv_nec)
 
     # Map init values to new domains
     new_init = process_init(sas_task.init, vars_vals_map, relevant_facts, new_variables, ordered)
@@ -56,8 +60,8 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered=Fals
     # Map axioms
     new_axioms = process_axioms(sas_task.axioms)
 
-    new_task = SASTask(variables=new_variables, mutexes=new_mutexes, \
-                   init=new_init, goal=new_goal, operators=new_operators, axioms=new_axioms, metric=True if ordered else sas_task.metric)
+    new_task = SASTask(variables=new_variables, mutexes=new_mutexes,
+                   init=new_init, goal=new_goal, operators=new_operators, axioms=new_axioms, metric=new_metric)
     
     # Remove unreachable facts and useless variables using FD code
     filter_unreachable_propositions(new_task)
@@ -129,7 +133,7 @@ def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
     return SASVariables(ranges=new_ranges, axiom_layers=new_axiom_layers, value_names=new_value_names)\
            , vars_new_vals_map
 
-def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ordered, costs_task, triv_nec=-1):
+def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ordered, reduction, triv_nec=-1):
     processed_operators = []
     # Variable to maintain order is ALWAYS the last variable
     ordered_var = len(variables.ranges) - 1
@@ -160,7 +164,10 @@ def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ord
                 # We are assuming the input domain does not have action 'skip-action'. Should we think of a better name for this action?
                 processed_operators.append(SASOperator(name='(skip-action plan-pos-%i)' % op_index, prevail=[], pre_post=[(ordered_var, op_index, op_index + 1, [])], cost=0))
 
-        processed_operators.append(SASOperator(name=op.name, prevail=new_prev, pre_post=new_pre_post, cost=op.cost if not ordered or costs_task else 1))
+        # For MLR we need op_cost of 1 and skip actions of cost=0 
+        # For MR we need to maintain the operators' original cost
+        op_cost = op.cost if reduction == MR else 1
+        processed_operators.append(SASOperator(name=op.name, prevail=new_prev, pre_post=new_pre_post, cost=op_cost))
 
     return processed_operators
 
@@ -270,7 +277,7 @@ def main():
 
     task, operator_name_to_index_map = parse_task(options.task)
     plan_size, plan, plan_cost = parse_plan(options.plan)
-    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, options.enhanced)
+    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, options.enhanced, options.reduction)
     
     with open(os.path.join(options.directory, options.file), mode='w') as output_file:
         new_task.output(stream=output_file)

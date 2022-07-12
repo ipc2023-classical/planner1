@@ -93,7 +93,13 @@ def parse_task(task_file):
 
             current_line = get_next_line()
             assert(current_line == 'end_mutex_group')
-            mutex_groups.append(SASMutexGroup(facts=current_group))
+
+            # Create mutex group with empty facts
+            # The constructor of SASMutexGroup reorders the facts. 
+            # This causes the parsed task to not be exactly equal to the task defined in the input file (diff. order facts in mutexes)
+            # Creating the SASMutex and then adding the facts maintains order of the input task file
+            mutex_groups.append(SASMutexGroup(facts=[]))
+            mutex_groups[-1].facts = current_group
 
         # Read initial state
         current_line = get_next_line()
@@ -148,7 +154,10 @@ def parse_task(task_file):
             current_line = get_next_line()
             assert(current_line == 'end_operator')
 
-            # Create operator with empty prev, pre_post. Done to maintain orignal SAS+ task variable order
+            # Create operator with empty prev, pre_post. 
+            # The constructor of SASOperator reorders the prevail and pre_post. 
+            # This causes the parsed task to not be exactly equal to the task defined in the input file (diff. order of prevails, pre_posts)
+            # Creating the SASOpertor and then adding the prevail, pre_post maintains order of the input task file.
             operators.append(SASOperator(name=operator_name, prevail=[], pre_post=[], cost=cost))
             operators[-1].prevail = prevail_cond
             operators[-1].pre_post = effects
