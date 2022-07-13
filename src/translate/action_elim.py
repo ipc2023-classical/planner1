@@ -86,8 +86,15 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
     return new_task
 
 def get_operators_from_plan(operators, plan, operator_name_to_index, ordered):
-    # TODO: add each operator only once.
-    return [operators[operator_name_to_index[op]] for op in plan]
+    if ordered:
+        # Ordered tasks create a different operator for each operator in the plan
+        return [operators[operator_name_to_index[op]] for op in plan]
+    else:
+        # Unordered tasks create a different operator for each unique operator in the plan
+        added = set()
+        # added.add(op) is only used for its' side effects. 
+        # set.add(x) always returns None so it doesn't affect the condition
+        return [operators[operator_name_to_index[op]] for op in plan if not (op in added or added.add(op))]
 
 def find_relevant_facts(sas_task, operators, operator_name_to_index):
     is_fact_relevant = [[False] * domain_size for domain_size in sas_task.variables.ranges]
@@ -112,10 +119,6 @@ def find_relevant_facts(sas_task, operators, operator_name_to_index):
             # Uncomment Code to make 9 value relevant
             # is_fact_relevant[var][new_val] = True
 
-    # All values of order variable are relevant!
-    # TODO: Remove this tight coupling and handle the skip operators outside of this function.
-    is_fact_relevant.append([True] * (len(operators) + 1))
-
     return is_fact_relevant
 
 def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
@@ -126,8 +129,7 @@ def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
     new_ranges = []
 
     # For each relevant fact, add to new domain
-    # TODO: Don't forget to replace is_fact_relevant[:-1] by is_fact_relevant once the skip var is handled separately.
-    for var, rel_facts in enumerate(is_fact_relevant[:-1]):
+    for var, rel_facts in enumerate(is_fact_relevant):
         next_val = 0
         current_val_names = []
         for val, is_rel in enumerate(rel_facts):
@@ -149,6 +151,7 @@ def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
         new_axiom_layers.append(-1)
         new_value_names.append(['Atom plan-pos-%i()' % i for i in range(len(plan) + 1)])
         vars_new_vals_map.append([i for i in range(len(plan) + 1)])
+        is_fact_relevant.append([True] * (len(plan) + 1))
 
     return SASVariables(ranges=new_ranges, axiom_layers=new_axiom_layers, value_names=new_value_names)\
            , vars_new_vals_map
@@ -223,8 +226,10 @@ def process_axioms(axioms):
 def map_goal_vals(goal, vars_vals_map):
     return SASGoal(pairs=[(var, vars_vals_map[var][val]) for var, val in goal.pairs])
 
-# Finds trivially necessary actions
-# TODO: Describe what a trivially necessary action is.
+# With a task and a plan, finds trivially necessary actions in the plan. (related to landmarks)
+# When solving MR and MLR (action order maintained), trivially necessary actions are those that cannot be skipped.
+# Either because they are the only action that achieves a goal
+# Or because they are the only action that achieves a precondition for another triv. nec. action
 def find_triv_nec_actions(init, goal, variables, plan):
     # Find achievers for each fact
     fact_achievers = [[[] for _ in range(dom_size)] for dom_size in variables.ranges]
