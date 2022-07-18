@@ -227,6 +227,9 @@ def run_eliminate_actions(args):
         os.rename(plan_files[0], new_file_name)
         last_plan_file = new_file_name
 
+    # Add found plan to manager...
+    plan_manager.process_new_plans()
+
     ae_plan_file = plan_manager._get_plan_file(len(plan_files) + 1)
     # TODO ASK: what time limits should we use?
     time_limit = limits.get_time_limit(None, args.overall_time_limit)
@@ -288,7 +291,9 @@ def run_eliminate_actions(args):
     # Otherwise it is not a valid plan for the original task.
     # Where should we add this?
     plan_len, cleaned_plan, plan_cost = parse_plan_filter_skip_actions(ae_plan_file)
+    cleaned_plan.append("; cost = %d (%s)" % (plan_cost, "general cost" \
+                        if plan_manager.get_problem_type() == "general cost" else "unit cost"))
     with open(ae_plan_file, 'w') as found_plan:
-        found_plan.writelines(cleaned_plan)
+        found_plan.write("\n".join(cleaned_plan))
 
     return 0, True

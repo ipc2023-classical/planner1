@@ -150,7 +150,7 @@ def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
     return SASVariables(ranges=new_ranges, axiom_layers=new_axiom_layers, value_names=new_value_names)\
            , vars_new_vals_map
 
-def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ordered, reduction, triv_nec):
+def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ordered, use_costs, triv_nec):
     processed_operators = []
     # Variable to maintain order is ALWAYS the last variable
     ordered_var = len(variables.ranges) - 1
@@ -183,7 +183,7 @@ def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ord
 
         # For MLR we need op_cost of 1 and skip actions of cost=0
         # For MR we need to maintain the operators' original cost
-        op_cost = op.cost if reduction == MR else 1
+        op_cost = op.cost if use_costs else 1
         processed_operators.append(SASOperator(name=op.name, prevail=new_prev, pre_post=new_pre_post, cost=op_cost))
 
     return processed_operators
