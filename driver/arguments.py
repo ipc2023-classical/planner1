@@ -159,6 +159,7 @@ def _split_planner_args(parser, args):
 
     args.translate_options = []
     args.search_options = []
+    args.action_elimination_options = []
 
     curr_options = args.search_options
     for option in options:
@@ -166,6 +167,8 @@ def _split_planner_args(parser, args):
             curr_options = args.translate_options
         elif option == "--search-options":
             curr_options = args.search_options
+        elif option == "--action-elimination-options":
+            curr_options = args.action_elimination_options
         else:
             curr_options.append(option)
 
@@ -219,6 +222,8 @@ def _set_components_and_inputs(parser, args):
         args.components.append("translate")
     if args.search or args.run_all:
         args.components.append("search")
+    if args.eliminate_actions:
+        args.components.append("eliminate-actions")
 
     if not args.components:
         _set_components_automatically(parser, args)
@@ -358,6 +363,9 @@ def parse_args():
     components.add_argument(
         "--search", action="store_true",
         help="run search component")
+    components.add_argument(
+        "--eliminate-actions", action="store_true",
+        help="run action elimination after search")
 
     limits = parser.add_argument_group(
         title="time and memory limits", description=LIMITS_HELP)

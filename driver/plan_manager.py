@@ -29,6 +29,13 @@ def _parse_plan(plan_filename):
     else:
         return None, None
 
+def parse_plan_filter_skip_actions(planfile):
+    with open(planfile) as stream:
+        lines = stream.readlines()
+    plan = [act.strip() for act in lines[:-1] if "skip-action plan-pos-" not in act]
+    total_cost = int(re.match(r"; cost = (\d+) \(.+ cost\)", lines[-1]).group(1))
+    return len(plan), plan, total_cost
+
 
 class PlanManager:
     def __init__(self, plan_prefix, portfolio_bound=None, single_plan=False):

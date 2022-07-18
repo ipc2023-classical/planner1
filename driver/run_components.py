@@ -11,10 +11,11 @@ from . import limits
 from . import portfolio_runner
 from . import returncodes
 from . import util
-from .plan_manager import PlanManager
+from .plan_manager import PlanManager, parse_plan_filter_skip_actions
 
 # TODO: We might want to turn translate into a module and call it with "python3 -m translate".
 REL_TRANSLATE_PATH = os.path.join("translate", "translate.py")
+REL_ACTION_ELIMINATION_PATH = os.path.join("translate", "action_elim.py")
 if os.name == "posix":
     REL_SEARCH_PATH = "downward"
     VALIDATE = "validate"
@@ -202,3 +203,92 @@ def run_validate(args):
             returncodes.exit_with_driver_critical_error(err)
     else:
         return (0, True)
+
+def run_eliminate_actions(args):
+    logging.info("Running create action elimination task.")
+
+    plan_manager = PlanManager(
+        args.plan_file,
+        portfolio_bound=args.portfolio_bound,
+        single_plan=False)
+
+    # Get last found plan using plan_manager
+    # Cannot use len(plan_manager._plan_costs) to identify the number of plans!
+    # Search might find single plan and not add a suffix, so plan_manager does not find it
+    plan_files = list(PlanManager(args.plan_file).get_existing_plans())
+    if not plan_files:
+        print("Not running action elimination since no plans found.")
+        return (0, True)
+
+    # TODO ASK: Should we rename sas_plan to sas_plan.1?
+    # Validate behaves weirdly if we don't
+    if len(plan_files) == 1:
+        new_file_name = plan_manager._get_plan_file(1)
+        os.rename(plan_files[0], new_file_name)
+        last_plan_file = new_file_name
+
+    ae_plan_file = plan_manager._get_plan_file(len(plan_files) + 1)
+    # TODO ASK: what time limits should we use?
+    time_limit = limits.get_time_limit(None, args.overall_time_limit)
+    memory_limit = limits.get_memory_limit(None, args.overall_memory_limit)
+
+    try:
+        split_index = args.action_elimination_options.index("--planner-config")
+        search_options = args.action_elimination_options[split_index + 1:]
+    except:
+        split_index = len(args.action_elimination_options)
+        # TODO DISCUSS: when using --enhanced option in AE,
+        # We get the best results with simpler heuristics.
+        # Set lmcut as default for now, but might be better to choose another one
+        search_options = ["--search", "astar(lmcut())"]
+
+    ae_options = args.action_elimination_options[:split_index]
+    planner_options = ["--internal-plan-file", ae_plan_file] + search_options
+
+    # Get action elimination sas task file
+    try:
+        ae_task_file = ae_options[ae_options.index("--file") + 1]
+    except:
+        ae_task_file = "action-elimination.sas"
+        ae_options += ["--file", ae_task_file]
+
+    assert sys.executable, "Path to interpreter could not be found"
+    action_elimination = get_executable(args.build, REL_ACTION_ELIMINATION_PATH)
+    # TODO ASK: output.sas (args.sas_file) might already haven been deleted.
+    # Should we create it again, or delay deletion until after AE?
+    # Currently only works if --keep-sas-file is specified
+    cmd = [sys.executable] + [action_elimination] + ae_options + ["-t", args.sas_file, "-p", last_plan_file]
+
+    try:
+        call.check_call(
+            "action-elimination",
+            cmd,
+            time_limit=time_limit,
+            memory_limit=memory_limit)
+    except subprocess.CalledProcessError as err:
+        print("Action elimination module error. Action elimination won't be executed")
+        return err.returncode, False
+
+    executable = get_executable(args.build, REL_SEARCH_PATH)
+    logging.info("Running search for action elimination task.")
+
+    try:
+        call.check_call(
+                "search",
+                [executable] + planner_options,
+                stdin=ae_task_file,
+                time_limit=time_limit,
+                memory_limit=memory_limit)
+    except subprocess.CalledProcessError as err:
+            assert err.returncode >= 10 or err.returncode < 0, "got returncode < 10: {}".format(err.returncode)
+            return (err.returncode, False)
+
+    # TODO: Maybe not the best place to do this,
+    # but we have to remove skip actions from the plan.
+    # Otherwise it is not a valid plan for the original task.
+    # Where should we add this?
+    plan_len, cleaned_plan, plan_cost = parse_plan_filter_skip_actions(ae_plan_file)
+    with open(ae_plan_file, 'w') as found_plan:
+        found_plan.writelines(cleaned_plan)
+
+    return 0, True

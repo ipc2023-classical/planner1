@@ -12,7 +12,6 @@
 
 """
 Creates an action elimination task for an automated planning task and a valid plan.
-Currently reduction will always be MR, will include MLR in the future.
 Examples: <param> is a nec. parameter, while [param=val] is an optional parameter with default value = val
 Maintain order of actions and compute triv. nec actions in original plan call string:
     ./action_elim.py  -t <output.sas> -p <sas_plan> -s -e -r [reduction=MR] -f [file=reformulation.sas] -d [directory=.]
@@ -92,7 +91,7 @@ def get_operators_from_plan(operators, plan, operator_name_to_index, ordered):
     else:
         # Unordered tasks create a different operator for each unique operator in the plan
         added = set()
-        # added.add(op) is only used for its' side effects. 
+        # added.add(op) is only used for its' side effects.
         # set.add(x) always returns None so it doesn't affect the condition
         return [operators[operator_name_to_index[op]] for op in plan if not (op in added or added.add(op))]
 
@@ -108,16 +107,9 @@ def find_relevant_facts(sas_task, operators, operator_name_to_index):
         for var, val in op.prevail:
             is_fact_relevant[var][val] = True
 
-        # TODO: Ask: Should we add a 'default' val to all variable domains?
-        # Let one action pre_post be 1 -> 9
-        # Is 9 relevant? What if 9 is never in the precond part of the effect of an action?
-        # If it's not relevant, what do we do with the value of variable? Map it to a default val might reduce dom size (?)
-        # TODO: If value 9 is irrelevant turn "1 -> 9" pre-post condition into "1 -> 1" prevail condition.
-        for var, old_val, new_val, _ in op.pre_post:
+        for var, old_val, _, _ in op.pre_post:
             if old_val > -1:
                 is_fact_relevant[var][old_val] = True
-            # Uncomment Code to make 9 value relevant
-            # is_fact_relevant[var][new_val] = True
 
     return is_fact_relevant
 
@@ -137,7 +129,9 @@ def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
                 vars_new_vals_map[var][val] = next_val
                 current_val_names.append(variables.value_names[var][val])
                 next_val += 1
-        # Code to create default 'Some value not in any precond' value of variable
+        # Irrelevant facts will al be mapped to a new domain value
+        # This will potentially reduce the domain size of the variables
+        # This new value will always be the greater val of the domain
         current_val_names.append('Atom irrelevant-fact()')
         next_val += 1
         # End code for some value not in any precond
@@ -258,7 +252,6 @@ def find_triv_nec_actions(init, goal, variables, plan):
             current_op = extended_plan[op_index]
             for var, val in current_op.prevail:
                 # If one pre has only one achiever that is not the initial state, that achiever is nec!
-
                 if sum(1 for achiever in fact_achievers[var][val] if achiever < op_index) < 2:
                     if fact_achievers[var][val][0] > -1:
                         triv_nec[fact_achievers[var][val][0]] = True
