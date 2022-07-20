@@ -82,7 +82,10 @@ def compute_run_time(timeout, configs, pos):
     remaining_time = timeout - util.get_elapsed_time()
     print("remaining time: {}".format(remaining_time))
     relative_time = configs[pos][0]
-    remaining_relative_time = sum(config[0] for config in configs[pos:])
+    # Impose no time limit for configs with a negative timeout value.
+    if relative_time < 0:
+        return remaining_time
+    remaining_relative_time = sum(config[0] for config in configs[pos:] if config[0] >= 0)
     print("config {}: relative time {}, remaining {}".format(
           pos, relative_time, remaining_relative_time))
     # For the last config we have relative_time == remaining_relative_time, so
