@@ -160,6 +160,7 @@ def _split_planner_args(parser, args):
     args.translate_options = []
     args.search_options = []
     args.action_elimination_options = []
+    args.action_elimination_planner_configuration = []
 
     curr_options = args.search_options
     for option in options:
@@ -169,6 +170,8 @@ def _split_planner_args(parser, args):
             curr_options = args.search_options
         elif option == "--action-elimination-options":
             curr_options = args.action_elimination_options
+        elif option == "--action-elimination-planner-config":
+            curr_options = args.action_elimination_planner_configuration
         else:
             curr_options.append(option)
 
@@ -224,6 +227,9 @@ def _set_components_and_inputs(parser, args):
         args.components.append("search")
     if args.eliminate_actions:
         args.components.append("eliminate-actions")
+        # Needed for action_elimination module
+        args.search_options += ["--internal-previous-portfolio-plans", "0"]
+        args.keep_sas_file = True
 
     if not args.components:
         _set_components_automatically(parser, args)

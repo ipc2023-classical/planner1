@@ -286,7 +286,7 @@ def main():
         sys.exit(2)
 
     task, operator_name_to_index_map = parse_task(options.task)
-    plan_length, plan, plan_cost = parse_plan(options.plan)
+    plan, plan_cost = parse_plan(options.plan)
     new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, options.enhanced, options.reduction)
 
     with open(os.path.join(options.directory, options.file), mode='w') as output_file:
