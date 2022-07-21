@@ -432,6 +432,9 @@ def parse_args():
     driver_other.add_argument(
         "--portfolio-single-plan", action="store_true",
         help="abort satisficing portfolio after finding the first plan")
+    driver_other.add_argument(
+        "--portfolio-eliminate-actions", action="store_true",
+        help="run action elimination after each new found plan in portfolio")
 
     driver_other.add_argument(
         "--cleanup", action="store_true",
@@ -492,6 +495,9 @@ def parse_args():
     if args.portfolio_single_plan and not args.portfolio:
         print_usage_and_exit_with_driver_input_error(
             parser, "--portfolio-single-plan may only be used for portfolios.")
+    if args.portfolio_eliminate_actions and not args.portfolio:
+        print_usage_and_exit_with_driver_input_error(
+            parser, "--portfolio-eliminate-actions may only be used for portfolios.")
 
     if not args.version and not args.show_aliases and not args.cleanup:
         _set_components_and_inputs(parser, args)

@@ -147,7 +147,7 @@ def run_search(args):
         logging.info("search portfolio: %s" % args.portfolio)
         return portfolio_runner.run(
             args.portfolio, executable, args.search_input, plan_manager,
-            time_limit, memory_limit)
+            time_limit, memory_limit, args)
     else:
         if not args.search_options:
             returncodes.exit_with_driver_input_error(
@@ -277,5 +277,6 @@ def run_eliminate_actions(args):
     # Write cleaned plan to file
     with open(ae_plan_file, 'w') as found_plan:
         found_plan.write("\n".join(cleaned_plan))
+        found_plan.write("\n")
 
     return 0, True
