@@ -6,7 +6,6 @@ import signal
 import subprocess
 import sys
 import re
-from time import sleep
 
 from . import call
 from . import limits
@@ -222,19 +221,10 @@ def run_eliminate_actions(args):
         single_plan=False)
 
     # Get last found plan using plan_manager
-    # Cannot use len(plan_manager._plan_costs) to identify the number of plans!
-    # Search might find single plan and not add a suffix, so plan_manager does not find it
     plan_files = list(PlanManager(args.plan_file).get_existing_plans())
     if not plan_files:
         print("Not running action elimination since no plans found.")
         return (0, True)
-
-    # TODO ASK: Should we rename sas_plan to sas_plan.1?
-    # Validate behaves weirdly if we don't
-    #if len(plan_files) == 1:
-    #    new_file_name = plan_manager._get_plan_file(1)
-    #    os.rename(plan_files[0], new_file_name)
-    #    last_plan_file = new_file_name
 
     # Add found plan to manager...
     plan_manager.process_new_plans()
@@ -246,12 +236,8 @@ def run_eliminate_actions(args):
     ae_options = args.action_elimination_options
     planner_options = ["--internal-plan-file", ae_plan_file] + args.action_elimination_planner_configuration
 
-    # Get action elimination sas task file
-    try:
-        ae_task_file = ae_options[ae_options.index("--file") + 1]
-    except:
-        ae_task_file = "action-elimination.sas"
-        ae_options += ["--file", ae_task_file]
+    # Action elimination produced task file is always this one
+    ae_task_file = "action-elimination.sas"
 
     assert sys.executable, "Path to interpreter could not be found"
     action_elimination = get_executable(args.build, REL_ACTION_ELIMINATION_PATH)
@@ -287,6 +273,8 @@ def run_eliminate_actions(args):
     cleaned_plan, plan_cost = parse_plan_filter_skip_actions(ae_plan_file)
     cleaned_plan.append("; cost = %d (%s)" % (plan_cost, "general cost" \
                         if plan_manager.get_problem_type() == "general cost" else "unit cost"))
+
+    # Write cleaned plan to file
     with open(ae_plan_file, 'w') as found_plan:
         found_plan.write("\n".join(cleaned_plan))
 
