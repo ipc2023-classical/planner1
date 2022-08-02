@@ -269,6 +269,8 @@ def _set_components_and_inputs(parser, args):
         else:
             print_usage_and_exit_with_driver_input_error(
                 parser, "search needs exactly one input file")
+    elif first == "eliminate-actions":
+        pass
     else:
         assert False, first
 

@@ -228,6 +228,7 @@ def run_eliminate_actions(args):
 
     # Add found plan to manager...
     plan_manager.process_new_plans()
+    old_plan_cost = plan_manager.get_next_portfolio_cost_bound()
 
     ae_plan_file = plan_manager._get_plan_file(len(plan_files) + 1)
     time_limit = limits.get_time_limit(None, args.overall_time_limit)
@@ -273,6 +274,9 @@ def run_eliminate_actions(args):
     cleaned_plan, plan_cost = parse_plan_filter_skip_actions(ae_plan_file)
     cleaned_plan.append("; cost = %d (%s)" % (plan_cost, "general cost" \
                         if plan_manager.get_problem_type() == "general cost" else "unit cost"))
+
+    logging.info("Old plan cost: %d" % old_plan_cost)
+    logging.info("New plan cost: %d" % plan_cost)
 
     # Write cleaned plan to file
     with open(ae_plan_file, 'w') as found_plan:
