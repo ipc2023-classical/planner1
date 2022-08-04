@@ -22,6 +22,7 @@ from . import call
 from . import limits
 from . import returncodes
 from . import util
+from . import run_components
 
 
 DEFAULT_TIMEOUT = 1800
@@ -82,7 +83,10 @@ def compute_run_time(timeout, configs, pos):
     remaining_time = timeout - util.get_elapsed_time()
     print("remaining time: {}".format(remaining_time))
     relative_time = configs[pos][0]
-    remaining_relative_time = sum(config[0] for config in configs[pos:])
+    # Impose no time limit for configs with a negative timeout value.
+    if relative_time < 0:
+        return remaining_time
+    remaining_relative_time = sum(config[0] for config in configs[pos:] if config[0] >= 0)
     print("config {}: relative time {}, remaining {}".format(
           pos, relative_time, remaining_relative_time))
     # For the last config we have relative_time == remaining_relative_time, so
@@ -108,7 +112,7 @@ def run_sat_config(configs, pos, search_cost_type, heuristic_cost_type,
 
 
 def run_sat(configs, executable, sas_file, plan_manager, final_config,
-            final_config_builder, timeout, memory):
+            final_config_builder, timeout, memory, cmd_args):
     # If the configuration contains S_COST_TYPE or H_COST_TRANSFORM and the task
     # has non-unit costs, we start by treating all costs as one. When we find
     # a solution, we rerun the successful config with real costs.
@@ -129,6 +133,11 @@ def run_sat(configs, executable, sas_file, plan_manager, final_config,
                 return
 
             if exitcode == returncodes.SUCCESS:
+                if cmd_args.portfolio_eliminate_actions:
+                    # Run action elimination and process new plan
+                    run_components.run_eliminate_actions(cmd_args)
+                    plan_manager.process_new_plans()
+
                 if plan_manager.abort_portfolio_after_first_plan():
                     return
                 configs_next_round.append((relative_time, args))
@@ -201,7 +210,7 @@ def get_portfolio_attributes(portfolio):
     return attributes
 
 
-def run(portfolio, executable, sas_file, plan_manager, time, memory):
+def run(portfolio, executable, sas_file, plan_manager, time, memory, args):
     """
     Run the configs in the given portfolio file.
 
@@ -234,5 +243,5 @@ def run(portfolio, executable, sas_file, plan_manager, time, memory):
     else:
         exitcodes = run_sat(
             configs, executable, sas_file, plan_manager, final_config,
-            final_config_builder, timeout, memory)
+            final_config_builder, timeout, memory, args)
     return returncodes.generate_portfolio_exitcode(list(exitcodes))

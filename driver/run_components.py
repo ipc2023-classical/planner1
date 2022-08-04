@@ -5,6 +5,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import re
 
 from . import call
 from . import limits
@@ -15,6 +16,7 @@ from .plan_manager import PlanManager
 
 # TODO: We might want to turn translate into a module and call it with "python3 -m translate".
 REL_TRANSLATE_PATH = os.path.join("translate", "translate.py")
+REL_ACTION_ELIMINATION_PATH = os.path.join("translate", "action_elim.py")
 if os.name == "posix":
     REL_SEARCH_PATH = "downward"
     VALIDATE = "validate"
@@ -145,7 +147,7 @@ def run_search(args):
         logging.info("search portfolio: %s" % args.portfolio)
         return portfolio_runner.run(
             args.portfolio, executable, args.search_input, plan_manager,
-            time_limit, memory_limit)
+            time_limit, memory_limit, args)
     else:
         if not args.search_options:
             returncodes.exit_with_driver_input_error(
@@ -202,3 +204,83 @@ def run_validate(args):
             returncodes.exit_with_driver_critical_error(err)
     else:
         return (0, True)
+
+def run_eliminate_actions(args):
+    def parse_plan_filter_skip_actions(planfile):
+        with open(planfile) as stream:
+            lines = stream.readlines()
+        plan = [op.strip() for op in lines[:-1] if not op.startswith("(skip-action plan-pos-")]
+        total_cost = int(re.match(r"; cost = (\d+) \(.+ cost\)", lines[-1]).group(1))
+        return plan, total_cost
+
+    logging.info("Eliminate actions")
+
+    plan_manager = PlanManager(
+        args.plan_file,
+        portfolio_bound=args.portfolio_bound,
+        single_plan=False)
+
+    # Get last found plan using plan_manager
+    plan_files = list(PlanManager(args.plan_file).get_existing_plans())
+    if not plan_files:
+        print("Not running action elimination since no plans found.")
+        return (0, True)
+
+    # Add found plan to manager...
+    plan_manager.process_new_plans()
+    old_plan_cost = plan_manager.get_next_portfolio_cost_bound()
+
+    ae_plan_file = plan_manager._get_plan_file(len(plan_files) + 1)
+    time_limit = limits.get_time_limit(None, args.overall_time_limit)
+    memory_limit = limits.get_memory_limit(None, args.overall_memory_limit)
+
+    ae_options = args.action_elimination_options
+    planner_options = ["--internal-plan-file", ae_plan_file] + args.action_elimination_planner_configuration
+
+    # Action elimination produced task file is always this one
+    ae_task_file = "action-elimination.sas"
+
+    assert sys.executable, "Path to interpreter could not be found"
+    action_elimination = get_executable(args.build, REL_ACTION_ELIMINATION_PATH)
+    last_plan_file = plan_manager._get_plan_file(plan_manager.get_plan_counter())
+    cmd = [sys.executable, action_elimination] + ae_options + ["-t", args.sas_file, "-p", last_plan_file]
+    logging.info("Creating action elimination task.")
+
+    try:
+        call.check_call(
+            "action-elimination",
+            cmd,
+            time_limit=time_limit,
+            memory_limit=memory_limit)
+    except subprocess.CalledProcessError as err:
+        print("Error while eliminating actions.", file=sys.stderr)
+        return err.returncode, False
+
+    executable = get_executable(args.build, REL_SEARCH_PATH)
+    logging.info("Running search for action elimination task.")
+
+    try:
+        call.check_call(
+                "search",
+                [executable] + planner_options,
+                stdin=ae_task_file,
+                time_limit=time_limit,
+                memory_limit=memory_limit)
+    except subprocess.CalledProcessError as err:
+            assert err.returncode >= 10 or err.returncode < 0, "got returncode < 10: {}".format(err.returncode)
+            return (err.returncode, False)
+
+    # Remove skip actions if present in plan
+    cleaned_plan, plan_cost = parse_plan_filter_skip_actions(ae_plan_file)
+    cleaned_plan.append("; cost = %d (%s)" % (plan_cost, "general cost" \
+                        if plan_manager.get_problem_type() == "general cost" else "unit cost"))
+
+    logging.info("Old plan cost: %d" % old_plan_cost)
+    logging.info("New plan cost: %d" % plan_cost)
+
+    # Write cleaned plan to file
+    with open(ae_plan_file, 'w') as found_plan:
+        found_plan.write("\n".join(cleaned_plan))
+        found_plan.write("\n")
+
+    return 0, True

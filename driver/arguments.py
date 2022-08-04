@@ -159,6 +159,8 @@ def _split_planner_args(parser, args):
 
     args.translate_options = []
     args.search_options = []
+    args.action_elimination_options = []
+    args.action_elimination_planner_configuration = []
 
     curr_options = args.search_options
     for option in options:
@@ -166,6 +168,10 @@ def _split_planner_args(parser, args):
             curr_options = args.translate_options
         elif option == "--search-options":
             curr_options = args.search_options
+        elif option == "--action-elimination-options":
+            curr_options = args.action_elimination_options
+        elif option == "--action-elimination-planner-config":
+            curr_options = args.action_elimination_planner_configuration
         else:
             curr_options.append(option)
 
@@ -219,6 +225,11 @@ def _set_components_and_inputs(parser, args):
         args.components.append("translate")
     if args.search or args.run_all:
         args.components.append("search")
+    if args.eliminate_actions:
+        args.components.append("eliminate-actions")
+        # Needed for action_elimination module
+        args.search_options += ["--internal-previous-portfolio-plans", "0"]
+        args.keep_sas_file = True
 
     if not args.components:
         _set_components_automatically(parser, args)
@@ -258,6 +269,8 @@ def _set_components_and_inputs(parser, args):
         else:
             print_usage_and_exit_with_driver_input_error(
                 parser, "search needs exactly one input file")
+    elif first == "eliminate-actions":
+        pass
     else:
         assert False, first
 
@@ -358,6 +371,9 @@ def parse_args():
     components.add_argument(
         "--search", action="store_true",
         help="run search component")
+    components.add_argument(
+        "--eliminate-actions", action="store_true",
+        help="run action elimination after search")
 
     limits = parser.add_argument_group(
         title="time and memory limits", description=LIMITS_HELP)
@@ -418,6 +434,9 @@ def parse_args():
     driver_other.add_argument(
         "--portfolio-single-plan", action="store_true",
         help="abort satisficing portfolio after finding the first plan")
+    driver_other.add_argument(
+        "--portfolio-eliminate-actions", action="store_true",
+        help="run action elimination after each new found plan in portfolio")
 
     driver_other.add_argument(
         "--cleanup", action="store_true",
@@ -478,6 +497,9 @@ def parse_args():
     if args.portfolio_single_plan and not args.portfolio:
         print_usage_and_exit_with_driver_input_error(
             parser, "--portfolio-single-plan may only be used for portfolios.")
+    if args.portfolio_eliminate_actions and not args.portfolio:
+        print_usage_and_exit_with_driver_input_error(
+            parser, "--portfolio-eliminate-actions may only be used for portfolios.")
 
     if not args.version and not args.show_aliases and not args.cleanup:
         _set_components_and_inputs(parser, args)
