@@ -184,3 +184,4 @@
 (move pos-2-1 pos-3-1 n0)
 (move pos-3-1 pos-3-0 n0)
 (destroy-block pos-3-0)
+; cost = 185 (unit cost)

@@ -50,3 +50,4 @@
 (walk_together tent0 place5 guy2 place4 girl2 couple2)
 (drive_passenger girl1 place5 place4 car1 girl0)
 (walk_together tent0 place5 guy1 place4 girl1 couple1)
+; cost = 51 (unit cost)

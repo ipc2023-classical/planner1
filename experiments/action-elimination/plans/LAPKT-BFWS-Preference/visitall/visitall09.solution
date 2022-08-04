@@ -2957,3 +2957,4 @@
 (move loc-x3-y53 loc-x2-y53)
 (move loc-x2-y53 loc-x1-y53)
 (move loc-x1-y53 loc-x0-y53)
+; cost = 2958 (unit cost)

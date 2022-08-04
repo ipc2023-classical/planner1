@@ -160,3 +160,4 @@
 (clean-shot shot1 ingredient4 left right)
 (grasp right shaker1)
 (pour-shaker-to-shot cocktail5 shot1 right shaker1 l1 l0)
+; cost = 161 (unit cost)

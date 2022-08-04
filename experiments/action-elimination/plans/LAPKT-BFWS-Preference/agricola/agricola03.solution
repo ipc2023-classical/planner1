@@ -79,3 +79,4 @@
 (ag__harvest_collect_end round13 stage5)
 (ag__harvest_feed round13 stage5 worker2 num8 num5 num3)
 (ag__harvest_breed_end round13 stage5)
+; cost = 4734 (general cost)

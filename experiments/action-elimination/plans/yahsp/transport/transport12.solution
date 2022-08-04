@@ -542,3 +542,4 @@
 (drive truck-4 city-loc-7 city-loc-42)
 (drive truck-4 city-loc-42 city-loc-9)
 (drop truck-4 city-loc-9 package-17 capacity-3 capacity-4)
+; cost = 5019 (general cost)

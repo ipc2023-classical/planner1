@@ -384,3 +384,4 @@
 (begin-transpose-splice g1 sub15)
 (end-splice-1 sub11 g1)
 (end-splice-2 sub11 sub15)
+; cost = 84 (general cost)

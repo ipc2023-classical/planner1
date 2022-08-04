@@ -111,3 +111,4 @@
 (tal-to-home-d sj st s n11 n10)
 (col-to-home-b sq sj s n12 n11 coln5 coln6)
 (col-to-home-b sk sq s n13 n12 coln6 coln7)
+; cost = 112 (unit cost)

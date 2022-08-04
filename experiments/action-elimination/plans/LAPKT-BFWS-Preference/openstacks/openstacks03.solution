@@ -498,3 +498,4 @@
 (ship-order-o101 n48 n49)
 (make-product-p145 )
 (ship-order-o51 n49 n50)
+; cost = 50 (general cost)

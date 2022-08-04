@@ -91,3 +91,4 @@
 (move-curb-to-car car_17 curb_11 car_01)
 (move-car-to-curb car_11 car_14 curb_11)
 (move-car-to-car car_27 car_15 car_11)
+; cost = 92 (general cost)

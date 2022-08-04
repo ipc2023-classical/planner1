@@ -21,3 +21,4 @@
 (pickup-tank d1 t2 l1 zero one)
 (swim d1 t2 l1 l0)
 (decompress d1 l0)
+; cost = 130 (general cost)

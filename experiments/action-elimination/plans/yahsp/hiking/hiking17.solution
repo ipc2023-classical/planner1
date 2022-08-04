@@ -1131,3 +1131,4 @@
 (drive_passenger guy0 place3 place2 car3 girl0)
 (walk_together tent3 place3 guy0 place2 girl0 couple0)
 (walk_together tent0 place4 guy0 place3 girl0 couple0)
+; cost = 1132 (unit cost)

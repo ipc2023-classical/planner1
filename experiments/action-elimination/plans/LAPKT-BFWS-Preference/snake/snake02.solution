@@ -51,3 +51,4 @@
 (move pos2-1 pos3-1 pos5-1 pos5-2)
 (move pos3-1 pos4-1 pos5-2 pos5-3)
 (move-and-eat-no-spawn pos4-1 pos5-1)
+; cost = 52 (unit cost)

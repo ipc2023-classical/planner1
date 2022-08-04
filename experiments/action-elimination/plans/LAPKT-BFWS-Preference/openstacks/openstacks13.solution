@@ -763,3 +763,4 @@
 (ship-order-o99 n72 n73)
 (ship-order-o101 n73 n74)
 (ship-order-o195 n74 n75)
+; cost = 75 (general cost)

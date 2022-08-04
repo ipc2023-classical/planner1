@@ -82,3 +82,4 @@
 (move_l_down f10-2f f11-2f f11-3f f12-2f f12-3f rightl1)
 (move_l_down f8-2f f9-2f f9-3f f10-2f f10-3f rightl5)
 (move_l_down f6-2f f7-2f f7-3f f8-2f f8-3f rightl4)
+; cost = 201 (general cost)

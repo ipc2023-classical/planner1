@@ -222,3 +222,4 @@
 (collect-card card-d1-s0-v6 card-d0-s0-v7 pile-1)
 (collect-card card-d0-s0-v7 card-d2-s0-v8 pile-1)
 (finish-collecting-deck card-d2-s0-v8 pile-1 pile-1)
+; cost = 43 (general cost)
