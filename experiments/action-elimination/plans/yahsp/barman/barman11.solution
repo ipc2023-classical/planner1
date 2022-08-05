@@ -375,3 +375,4 @@
 (pour-shaker-to-shot cocktail9 shot7 right shaker1 l2 l1)
 (leave right shaker1)
 (refill-shot shot13 ingredient4 left right dispenser4)
+; cost = 377 (unit cost)

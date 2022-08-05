@@ -92,3 +92,4 @@
 (change-color robot3 white black)
 (left robot2 tile_0-3 tile_0-2)
 (right robot1 tile_0-4 tile_0-5)
+; cost = 254 (general cost)

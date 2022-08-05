@@ -232,3 +232,4 @@
 (move pos-2-2 pos-2-3 n0)
 (move pos-2-3 pos-3-3 n0)
 (place-block pos-3-3 pos-3-4 n0 n1)
+; cost = 234 (unit cost)

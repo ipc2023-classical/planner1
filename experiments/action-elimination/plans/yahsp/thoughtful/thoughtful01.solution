@@ -286,3 +286,4 @@
 (col-to-home-b cj ct c n11 n10 coln3 coln4)
 (col-to-home-b hj ht h n11 n10 coln4 coln5)
 (col-to-home-b sj st s n11 n10 coln5 coln6)
+; cost = 288 (unit cost)

@@ -187,3 +187,4 @@
 (begin-transpose-splice g10 sub12)
 (end-splice-1 g49 g10)
 (end-splice-2 g49 sub12)
+; cost = 56 (general cost)

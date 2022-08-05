@@ -15,3 +15,4 @@
 (drive_passenger guy3 place2 place0 car1 girl3)
 (walk_together tent2 place1 guy3 place0 girl3 couple3)
 (walk_together tent3 place2 guy3 place1 girl3 couple3)
+; cost = 17 (unit cost)

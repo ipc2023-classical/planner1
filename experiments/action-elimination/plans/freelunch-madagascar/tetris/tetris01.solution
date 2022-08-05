@@ -24,3 +24,4 @@
 (move_two f4-0f f5-0f f6-0f straight0)
 (move_two f4-3f f5-3f f6-3f straight1)
 (move_two f7-2f f8-2f f9-2f straight2)
+; cost = 51 (general cost)

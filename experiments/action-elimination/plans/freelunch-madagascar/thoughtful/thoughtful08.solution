@@ -30,3 +30,4 @@
 (col-to-home-b h5 h4 h n5 n4 coln2 coln3)
 (tal-to-home-d c4 c3 c n4 n3)
 (col-to-home-b c5 c4 c n5 n4 coln3 coln4)
+; cost = 32 (unit cost)

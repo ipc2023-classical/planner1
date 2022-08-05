@@ -31,3 +31,4 @@
 (serve_sandwich_no_gluten sandw5 child2 tray3 table1)
 (serve_sandwich_no_gluten sandw6 child7 tray3 table1)
 (serve_sandwich_no_gluten sandw9 child9 tray2 table2)
+; cost = 33 (unit cost)
