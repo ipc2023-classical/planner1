@@ -623,8 +623,8 @@ def parse_task(task_file):
                     num_cond_effects, var_number, old_val, new_val = sas_task.readline().strip().split()
                 except:
                     # TODO should we include conditional effects?
-                    print(operator_name)
-                    print("Conditional effects not supported.")
+                    #print(operator_name)
+                    #print("Conditional effects not supported.")
                     return None, None
                 if int(num_cond_effects) > 0:
                     sys.exit("Conditional effects not supported.")
@@ -678,10 +678,10 @@ def parse_task(task_file):
     return SASTask(variables=variables, mutexes=mutex_groups, init=init_state, goal=goal, operators=operators, axioms=axioms, metric=metric), operator_name_to_index
 
 def main():
-    PLANNER_NAMES = ["freelunch-magadascar", "LAPKT-BFWS-Preference","yahsp"]
+    PLANNER_NAMES = ["freelunch-madagascar", "LAPKT-BFWS-Preference","yahsp"]
     current_dir = os.path.dirname(os.path.realpath(__file__))
     SAS_DIR = os.path.join(current_dir, "plans/translator")
-    BENCHMARKS_DIR = os.path.join(current_dir ,"domains/ipc2014/seq-sat")
+    BENCHMARKS_DIR = os.path.join(current_dir ,"domains/ipc2014/seq-agl")
     BENCHMARKS_DIR1 = os.path.join(current_dir ,"domains/ipc2018/sat")
     PLANS_DIR = os.path.join(current_dir,"plans")
 
@@ -689,7 +689,7 @@ def main():
             if os.path.isdir(os.path.join(BENCHMARKS_DIR, name))]
     SUITE1 = [name for name in os.listdir(BENCHMARKS_DIR1)
             if os.path.isdir(os.path.join(BENCHMARKS_DIR1, name))]
-
+    plans_changed = 0
     for planner_name in PLANNER_NAMES:
         for domain in SUITE:
             count = 1
@@ -709,16 +709,21 @@ def main():
                             lines = f.readlines()
                             if not lines[-1]:
                                 lines = lines[:-1]
-                            # If cost is already in the file, don't add it.
                             elif lines[-1].startswith("; cost = "):
-                                continue
+                                lines = lines[:-1]
                             if sas_task.metric:
                                 lines.append("; cost = %d (%s)\n" % (plan_cost, "general cost"))
                             else:
-                                lines.append("; cost = %d (%s)\n" % (plan_cost, "unit cost"))
+                                lines.append("; cost = %d (%s)\n" % (len(plan), "unit cost"))
+
                             f.seek(0)
                             f.writelines(lines)
                             f.truncate()
+                            plans_changed += 1
+                            # Could have just used validate... Add it as verification
+                            # are_different = subprocess.check_output(['validate', task.domain_file, task.problem_file, plan_file]).decode('utf-8')
+                            # if "Value: %d" % plan_cost not in are_different:
+                            #     print("Messed up the cost! " + plan_file)
                 count += 1
 
         for domain in SUITE1:
@@ -737,7 +742,7 @@ def main():
                             if not lines[-1]:
                                 lines = lines[:-1]
                             elif lines[-1].startswith("; cost = "):
-                                continue
+                                lines = lines[:-1]
                             if sas_task.metric:
                                 lines.append("; cost = %d (%s)\n" % (plan_cost, "general cost"))
                             else:
@@ -745,7 +750,12 @@ def main():
                             f.seek(0)
                             f.writelines(lines)
                             f.truncate()
+                            plans_changed += 1
+                            # Could have just used validate... Add it as verification
+                            # are_different = subprocess.check_output(['validate', task.domain_file, task.problem_file, plan_file]).decode('utf-8')
+                            # if "Value: %d" % plan_cost not in are_different:
+                            #     print("Messed up the cost! " + plan_file)
                 count += 1
-
+    print("Updated plans: ", plans_changed)
 if __name__ == "__main__":
     main()

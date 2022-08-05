@@ -78,3 +78,4 @@
 (move_tray tray2 table1 table2)
 (move_tray tray3 table3 kitchen)
 (move_tray tray4 table2 table3)
+; cost = 80 (unit cost)

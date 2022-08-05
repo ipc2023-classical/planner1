@@ -59,4 +59,4 @@
 (col-to-home-b d5 d4 d n5 n4 coln1 coln2)
 (col-to-home-b h5 h4 h n5 n4 coln2 coln3)
 (col-to-home-b s5 s4 s n5 n4 coln3 coln4)
-; cost = 60 (unit cost)
+; cost = 61 (unit cost)

@@ -185,4 +185,4 @@
 (move pos8-3 pos8-4 pos8-5 pos8-6)
 (move pos8-4 pos8-5 pos8-6 pos7-6)
 (move-and-eat-no-spawn pos8-5 pos8-6)
-; cost = 186 (unit cost)
+; cost = 187 (unit cost)

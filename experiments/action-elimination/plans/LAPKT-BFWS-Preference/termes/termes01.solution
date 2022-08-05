@@ -98,4 +98,4 @@
 (move pos-0-1 pos-0-0 n0)
 (move pos-0-0 pos-1-0 n0)
 (destroy-block pos-1-0)
-; cost = 99 (unit cost)
+; cost = 100 (unit cost)

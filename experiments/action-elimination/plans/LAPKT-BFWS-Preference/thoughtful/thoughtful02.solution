@@ -107,4 +107,4 @@
 (col-to-home-b dj dt d n11 n10 coln4 coln5)
 (tal-to-home-d st s9 s n10 n9)
 (col-to-home-b sj st s n11 n10 coln5 coln6)
-; cost = 108 (unit cost)
+; cost = 109 (unit cost)

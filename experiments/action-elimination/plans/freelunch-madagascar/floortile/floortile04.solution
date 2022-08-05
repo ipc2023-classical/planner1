@@ -77,3 +77,4 @@
 (paint-up robot1 tile_1-5 tile_0-5 white)
 (paint-up robot2 tile_1-1 tile_0-1 white)
 (left robot1 tile_0-5 tile_0-4)
+; cost = 212 (general cost)

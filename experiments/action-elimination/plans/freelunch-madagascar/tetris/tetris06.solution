@@ -45,3 +45,4 @@
 (move_square f5-0f f6-0f square1)
 (move_square f5-3f f6-3f square0)
 (move_two f9-1f f9-2f f9-3f straight2)
+; cost = 76 (general cost)

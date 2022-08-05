@@ -34,3 +34,4 @@
 (move_tray tray1 table1 table2)
 (move_tray tray2 table3 table1)
 (move_tray tray3 table2 table3)
+; cost = 36 (unit cost)

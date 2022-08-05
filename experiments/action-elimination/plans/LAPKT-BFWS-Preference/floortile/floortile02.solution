@@ -38,4 +38,4 @@
 (change-color robot1 black white)
 (down robot1 tile_1-1 tile_0-1)
 (paint-up robot1 tile_1-1 tile_0-1 white)
-; cost = 100 (general cost)
+; cost = 102 (general cost)

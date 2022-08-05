@@ -110,4 +110,4 @@
 (ag__harvest_collect_end round16 stage8)
 (ag__harvest_feed round16 stage8 worker3 num6 num6 num0)
 (ag__harvest_breed_end round16 stage8)
-; cost = 6017 (general cost)
+; cost = 6018 (general cost)

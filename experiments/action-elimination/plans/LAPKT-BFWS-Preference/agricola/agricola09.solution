@@ -128,4 +128,4 @@
 (ag__harvest_collect_end round19 stage11)
 (ag__harvest_feed round19 stage11 worker2 num4 num4 num0)
 (ag__harvest_breed_end round19 stage11)
-; cost = 6931 (general cost)
+; cost = 6932 (general cost)

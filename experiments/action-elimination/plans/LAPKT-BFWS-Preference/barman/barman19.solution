@@ -183,4 +183,4 @@
 (grasp right shaker1)
 (shake cocktail8 ingredient5 ingredient4 shaker1 right left)
 (pour-shaker-to-shot cocktail8 shot3 right shaker1 l2 l1)
-; cost = 184 (unit cost)
+; cost = 185 (unit cost)

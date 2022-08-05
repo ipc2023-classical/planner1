@@ -25,3 +25,4 @@
 (drop-tank d1 t3 l1 one two)
 (swim d1 t4 l1 l0)
 (decompress d1 l0)
+; cost = 135 (general cost)

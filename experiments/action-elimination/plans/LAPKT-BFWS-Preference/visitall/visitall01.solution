@@ -917,4 +917,4 @@
 (move loc-x3-y29 loc-x2-y29)
 (move loc-x2-y29 loc-x1-y29)
 (move loc-x1-y29 loc-x0-y29)
-; cost = 918 (unit cost)
+; cost = 919 (unit cost)

@@ -23,4 +23,4 @@
 (walk_together tent0 place1 guy3 place0 girl3 couple3)
 (walk_together tent3 place2 guy3 place1 girl3 couple3)
 (walk_together tent2 place3 guy3 place2 girl3 couple3)
-; cost = 24 (unit cost)
+; cost = 25 (unit cost)

@@ -113,4 +113,4 @@
 (col-to-home-b sk sq s n13 n12 coln4 coln5)
 (col-to-home-b dq dj d n12 n11 coln5 coln6)
 (col-to-home-b dk dq d n13 n12 coln6 coln7)
-; cost = 114 (unit cost)
+; cost = 115 (unit cost)

@@ -23,3 +23,4 @@
 (swim d1 t6 l5 l4)
 (swim d1 t3 l4 l0)
 (decompress d1 l0)
+; cost = 133 (general cost)

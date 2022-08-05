@@ -4145,4 +4145,4 @@
 (move loc-x9-y59 loc-x9-y60)
 (move loc-x9-y60 loc-x9-y61)
 (move loc-x9-y61 loc-x9-y62)
-; cost = 4146 (unit cost)
+; cost = 4147 (unit cost)
