@@ -26,3 +26,4 @@
 (swim d0 t0 l1 l0)
 (drop-tank d0 t0 l0 two three)
 (decompress d0 l0)
+; cost = 136 (general cost)

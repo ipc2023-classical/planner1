@@ -131,3 +131,4 @@
 (move pos4-7 pos3-7 pos2-7 pos1-7)
 (move pos3-7 pos2-7 pos1-7 pos1-6)
 (move-and-eat-no-spawn pos2-7 pos1-7)
+; cost = 133 (unit cost)

@@ -133,3 +133,4 @@
 (continue-splice-2 sub9 g28)
 (end-splice-1 g40 sub9)
 (end-splice-2 g40 sub15)
+; cost = 42 (general cost)

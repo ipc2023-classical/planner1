@@ -640,3 +640,4 @@
 (drive truck-3 city-loc-14 city-loc-34)
 (drive truck-3 city-loc-34 city-loc-17)
 (drop truck-3 city-loc-17 package-21 capacity-1 capacity-2)
+; cost = 5929 (general cost)

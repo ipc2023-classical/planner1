@@ -110,3 +110,4 @@
 (col-to-home dq ck d n12 dj n11)
 (col-to-home-b dk dq d n13 n12 coln5 coln6)
 (col-to-home-b ck cq c n13 n12 coln6 coln7)
+; cost = 112 (unit cost)

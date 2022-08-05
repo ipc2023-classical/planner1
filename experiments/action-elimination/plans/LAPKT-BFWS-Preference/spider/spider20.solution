@@ -319,3 +319,4 @@
 (collect-card card-d0-s0-v9 card-d0-s0-v10 pile-6)
 (collect-card card-d0-s0-v10 card-d2-s0-v11 pile-6)
 (finish-collecting-deck card-d2-s0-v11 pile-6 pile-6)
+; cost = 63 (general cost)
