@@ -6,3 +6,4 @@
 (catalytichydrogenationofnitrogroup h53 h55 h52 o19 o18 h54 h22 h23 n3 c1)
 (diazotization h53 o20 n3 o21 h24 n4 cl2 h52 na2 c1)
 (sandmeyerreaction cl2 n3 br1 n4 c1 cu1)
+; cost = 8 (unit cost)

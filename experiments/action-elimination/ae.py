@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import os
-
+from lab.experiment import ARGPARSER
 from downward import suites
 from downward.cached_revision import CachedFastDownwardRevision
 from downward.experiment import (
@@ -12,38 +12,66 @@ from downward.experiment import (
 from lab.experiment import Experiment
 import project
 
-
 REPO = project.get_repo_base()
 
 # Should be experiments/action/elimination
 current_dir = os.path.dirname(os.path.realpath(__file__))
 
-# TODO include 2018 ipc problems.
-BENCHMARKS_DIR = os.path.join(current_dir ,"domains/ipc2014/seq-sat")
+# Define all paths
+BENCHMARKS_2014_DIR = os.path.join(current_dir ,"domains/ipc2014/seq-agl")
+BENCHMARKS_2018_DIR = os.path.join(current_dir ,"domains/ipc2018/sat")
 PLANS_DIR = os.path.join(current_dir,"plans")
-
-# TODO magadascar, BFWS and yahsp lack plan cost in plan file. Causing problems, need to add cost line.
-# PLANNER_NAMES = ["lama-first", "cerberus", "freelunch-magadascar", "LAPKT-BFWS-Preference","yahsp"]
-PLANNER_NAMES = ["lama-first", "cerberus",]
 SAS_DIR = os.path.join(current_dir, "plans/translator")
+PLANNER_NAMES = ["lama-first", "cerberus", "freelunch-madagascar", "LAPKT-BFWS-Preference","yahsp"]
 
-SUITE = [name for name in os.listdir(BENCHMARKS_DIR)
-            if os.path.isdir(os.path.join(BENCHMARKS_DIR, name))]
+# Define problems to be solved
+SUITE_IPC2014 = [name for name in os.listdir(BENCHMARKS_2014_DIR)
+            if os.path.isdir(os.path.join(BENCHMARKS_2014_DIR, name))]
+SUITE_IPC2018 = [name for name in os.listdir(BENCHMARKS_2018_DIR)
+            if os.path.isdir(os.path.join(BENCHMARKS_2018_DIR, name))]
+
 # TODO single domain for a local test. Remember to change to all the domains
-SUITE = ["tetris"]
+# SUITE_IPC2014 = ["parking"]
 
 # If REVISION_CACHE is None, the default ./data/revision-cache is used.
 REVISION_CACHE = "./data/revision-cache"
 ENV = project.LocalEnvironment(processes=1)
 
-MR_ENHANCED_CONFIG = ["--action-elimination-options", "--reduction", "MR", "--subsequence", "--enhanced"]
-CONFIGS = {
-    "minimal-reduction-enhanced-astar-blind":
-    MR_ENHANCED_CONFIG + ["--action-elimination-planner-config", "--search", "astar(blind)"],
-    "minimal-reduction-enhanced-astar-hmax":
-    MR_ENHANCED_CONFIG + ["--action-elimination-planner-config", "--search", "astar(hmax)"],
-    # TODO add all discussed configs
+HEURISTICS_MAP = {
+    "astar-blind":
+    ["--action-elimination-planner-config", "--search", "astar(blind())"],
+    "astar-hmax":
+    ["--action-elimination-planner-config", "--search", "astar(hmax())"],
+    "astar-lmcut":
+    ["--action-elimination-planner-config", "--search", "astar(lmcut())"],
+    "astar-lmc-lazy-eval-lmc":
+    ["--action-elimination-planner-config", "--evaluator", "lmc=lmcount(lm_merged([lm_rhw(), lm_hm(m=1)]), admissible=true, cost_partitioning=suboptimal, reuse_costs=true, greedy=true)", "--search", "astar(lmc, lazy_evaluator=lmc)"],
+    "astar-bjolp":
+    ["--action-elimination-planner-config", "--evaluator", "lmc=lmcount(lm_merged([lm_rhw(),lm_hm(m=1)]),admissible=true)", "--search", "astar(lmc,lazy_evaluator=lmc)"],
+    # "sys-scp-cartesian":
+    # ["--action-elimination-planner-config", "--search", "astar(scp_online([projections(sys_scp(max_time=1, max_time_per_restart=0.2)), cartesian([goals()], max_time=1)], saturator=perimstar, max_time=1, interval=10K))"],
+    # "sys-scp":
+    # ["--action-elimination-planner-config", "--seasrch", "astar(scp_online([projections(sys_scp(max_time=1, max_time_per_restart=0.2))], saturator=perimstar, max_time=1, interval=10K))"],
+    # "cartesian":
+    # ["--action-elimination-planner-config", "--search", "astar(scp_online([cartesian([goals()], max_time=1)], saturator=perimstar, max_time=1, interval=10K))"],
+    # "sys2":
+    # ["--action-elimination-planner-config", "--search", "astar(scp_online([projections(systematic(2))], saturator=perimstar, max_time=1, interval=10K))"],
+    # "sys3exp":
+    # ["--action-elimination-planner-config", "--search", "astar(scp_online([projections(systematic(3))], saturator=perimstar, max_time=1, interval=10K))"]
 }
+
+MR_ENHANCED_CONFIG = ["--action-elimination-options", "--reduction", "MR", "--subsequence", "--enhanced"]
+MR_CONFIG = ["--action-elimination-options", "--reduction", "MR", "--subsequence"]
+
+enhanced_configs = {
+    "minimal-reduction-enhanced-" + h_name : MR_ENHANCED_CONFIG + h_config for (h_name, h_config) in HEURISTICS_MAP.items()
+}
+non_enhanced_confings = {
+    "minimal-reduction-" + h_name : MR_CONFIG + h_config for (h_name, h_config) in HEURISTICS_MAP.items() if h_name != "astar-blind"
+}
+
+CONFIGS = {**enhanced_configs, **non_enhanced_confings}
+
 BUILD_OPTIONS = []
 
 DRIVER_OPTIONS = [
@@ -51,7 +79,7 @@ DRIVER_OPTIONS = [
     "--overall-time-limit",
     "30m",
     "--overall-memory-limit",
-    "8192M",
+    "8G",
 ]
 # Pairs of revision identifier and revision nick.
 REVS = [
@@ -59,13 +87,40 @@ REVS = [
 ]
 ATTRIBUTES = [
     "error",
+    "planner_time",
+    "ae_planner_call_time",
+    "ae_total_time",
     "old_cost",
     "new_cost",
+    "create_ae_task_time",
     "search_start_time",
     "search_start_memory",
+    "search_time",
     "total_time",
     project.EVALUATIONS_PER_TIME,
 ]
+
+args = ARGPARSER.parse_args()
+config_domain = []
+
+if args.process_number != -1:
+    # Cluster execution, distribute load following process number
+    # Each process will run one config for every instances in one domain of the suites
+    # if args.process_number > suite_1_processes:
+    config_number = args.process_number // (len(SUITE_IPC2014) + len(SUITE_IPC2018))
+    domain_number = args.process_number % (len(SUITE_IPC2014) + len(SUITE_IPC2018))
+    # Int div. gets the config while mod gets domain number
+    if domain_number >= len(SUITE_IPC2014):
+        domain_number = domain_number - len(SUITE_IPC2014)
+        SUITE_IPC2014 = []
+        SUITE_IPC2018 = [SUITE_IPC2018[domain_number]]
+        current_config = list(CONFIGS.keys())[config_number]
+        CONFIGS = {current_config : CONFIGS[current_config]}
+    else:
+        SUITE_IPC2018 = []
+        SUITE_IPC2014 = [SUITE_IPC2014[domain_number]]
+        current_config = list(CONFIGS.keys())[config_number]
+        CONFIGS = {current_config : CONFIGS[current_config]}
 
 exp = Experiment(environment=ENV)
 for rev, rev_nick in REVS:
@@ -82,39 +137,83 @@ for rev, rev_nick in REVS:
     )
 
     for config_nick, config in CONFIGS.items():
-        algo_name = f"{rev_nick}-{config_nick}"
+        algo_name = f"{config_nick}"
         for planner_name in PLANNER_NAMES:
-            count = 1
-            for task in suites.build_suite(BENCHMARKS_DIR, SUITE):
-                plan_file = "{0}/{1}/{2}/{2}{3}{4}.solution".format(PLANS_DIR, planner_name, task.domain, "0" if count < 10 else "", count)
-                sas_file = "{0}/{1}/{1}{2}{3}.solution".format(SAS_DIR, task.domain, "0" if count < 10 else "", count)
-                if os.path.exists(plan_file) and os.path.exists(sas_file):
-                    algo = _DownwardAlgorithm(
-                        algo_name,
-                        cached_rev,
-                        DRIVER_OPTIONS,
-                        config,
-                    )
-                    run = FastDownwardRun(exp, algo, task)
-                    # One domain and problem can be used for multiple experiments
-                    # Since there are (potentiallty) different plans
-                    # Update problem name so reports don't break
-                    run.properties['id'][-1] = run.task.problem + "-%s" % planner_name
-                    run.properties['problem'] = run.task.problem + "-%s" % planner_name
-                    run.add_resource("sas_task", sas_file, "output.sas")
-                    run.add_resource("plan", plan_file, "sas_plan.1")
-                    exp.add_run(run)
-                count += 1
+            # Add all experiments for agile ipc2014
+            for domain in SUITE_IPC2014:
+                count = 1
+                # Have to do one domain at a time to keep track of plan number
+                for task in suites.build_suite(BENCHMARKS_2014_DIR, [domain]):
+                    plan_file = f"{PLANS_DIR}/{planner_name}/{task.domain}/{task.domain}{count:02d}.solution"
+                    sas_file = f"{SAS_DIR}/{task.domain}/{task.domain}{count:02d}.solution"
+                    if os.path.exists(plan_file) and os.path.exists(sas_file):
+                        planning_time_file = f"{PLANS_DIR}/{planner_name}/{task.domain}/{task.domain}{count:02d}.solution.timemilliseconds"
+                        with open(planning_time_file, 'r') as time_file:
+                            time_micros = int(time_file.readline())
+
+                        if time_micros <= 300000000:
+                            algo = _DownwardAlgorithm(
+                                algo_name,
+                                cached_rev,
+                                DRIVER_OPTIONS,
+                                config,
+                            )
+                            run = FastDownwardRun(exp, algo, task)
+                            # One domain and problem can be used for multiple experiments
+                            # Since there are (potentiallty) different plans
+                            # Update problem name so reports don't break
+                            run.properties['id'][-1] = run.task.problem + "-%s" % planner_name
+                            run.properties['problem'] = run.task.problem + "-%s" % planner_name
+                            run.add_resource("sas_task", sas_file, "output.sas")
+                            run.add_resource("plan", plan_file, "sas_plan.1")
+                            exp.add_run(run)
+                    count += 1
+                    # Only one instance per domain for testing!
+                    # break
+
+            # Add all experiments for agile ipc2018
+            for domain in SUITE_IPC2018:
+                count = 1
+                # Have to do one domain at a time to keep track of plan number
+                for task in suites.build_suite(BENCHMARKS_2018_DIR, [domain]):
+                    plan_file = f"{PLANS_DIR}/{planner_name}/{task.domain}/{task.domain}{count:02d}.solution"
+                    sas_file = f"{SAS_DIR}/{task.domain}/{task.domain}{count:02d}.solution"
+                    if os.path.exists(plan_file) and os.path.exists(sas_file):
+                        planning_time_file = f"{PLANS_DIR}/{planner_name}/{task.domain}/{task.domain}{count:02d}.solution.timemilliseconds"
+                        with open(planning_time_file, 'r') as time_file:
+                            time_micros = int(time_file.readline())
+
+                        if time_micros <= 300000000:
+                            algo = _DownwardAlgorithm(
+                                algo_name,
+                                cached_rev,
+                                DRIVER_OPTIONS,
+                                config,
+                            )
+                            run = FastDownwardRun(exp, algo, task)
+                            # One domain and problem can be used for multiple experiments
+                            # Since there are (potentiallty) different plans
+                            # Update problem name so reports don't break
+                            run.properties['id'][-1] = run.task.problem + "-%s" % planner_name
+                            run.properties['problem'] = run.task.problem + "-%s" % planner_name
+                            run.add_resource("sas_task", sas_file, "output.sas")
+                            run.add_resource("plan", plan_file, "sas_plan.1")
+                            exp.add_run(run)
+                    count += 1
+
+                    # Only one instance per domain for testing!
+                    # break
 
 exp.add_parser(project.FastDownwardExperiment.EXITCODE_PARSER)
 exp.add_parser(project.DIR / "ae_parser.py")
 exp.add_parser(project.FastDownwardExperiment.TRANSLATOR_PARSER)
-exp.add_parser(project.FastDownwardExperiment.ANYTIME_SEARCH_PARSER )
+exp.add_parser(project.FastDownwardExperiment.SINGLE_SEARCH_PARSER)
 exp.add_parser(project.DIR / "parser.py")
 exp.add_parser(project.FastDownwardExperiment.PLANNER_PARSER)
 
 exp.add_step("build", exp.build)
 exp.add_step("start", exp.start_runs)
+
 exp.add_fetcher(name="fetch")
 
 project.add_absolute_report(

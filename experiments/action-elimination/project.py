@@ -30,6 +30,18 @@ def parse_args():
     ARGPARSER.add_argument(
         "--relative", action="store_true", help="make relative scatter plots"
     )
+
+    # Cluster process number argument
+    ARGPARSER.add_argument(
+        "-p",
+        "--proc-number",
+        type=int,
+        required=False,
+        default=-1,
+        dest="process_number",
+        help="Process number. Used to distribute load of experiments"
+    )
+
     return ARGPARSER.parse_args()
 
 
