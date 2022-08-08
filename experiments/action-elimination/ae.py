@@ -25,10 +25,10 @@ SAS_DIR = os.path.join(current_dir, "plans/translator")
 PLANNER_NAMES = ["lama-first", "cerberus", "freelunch-madagascar", "LAPKT-BFWS-Preference","yahsp"]
 
 # Define problems to be solved
-SUITE_IPC2014 = [name for name in os.listdir(BENCHMARKS_2014_DIR)
-            if os.path.isdir(os.path.join(BENCHMARKS_2014_DIR, name))]
-SUITE_IPC2018 = [name for name in os.listdir(BENCHMARKS_2018_DIR)
-            if os.path.isdir(os.path.join(BENCHMARKS_2018_DIR, name))]
+SUITE_IPC2014 = sorted([name for name in os.listdir(BENCHMARKS_2014_DIR)
+            if os.path.isdir(os.path.join(BENCHMARKS_2014_DIR, name))])
+SUITE_IPC2018 = sorted([name for name in os.listdir(BENCHMARKS_2018_DIR)
+            if os.path.isdir(os.path.join(BENCHMARKS_2018_DIR, name))])
 
 # TODO single domain for a local test. Remember to change to all the domains
 # SUITE_IPC2014 = ["parking"]
@@ -42,12 +42,12 @@ HEURISTICS_MAP = {
     ["--action-elimination-planner-config", "--search", "astar(blind())"],
     "astar-hmax":
     ["--action-elimination-planner-config", "--search", "astar(hmax())"],
-    "astar-lmcut":
-    ["--action-elimination-planner-config", "--search", "astar(lmcut())"],
-    "astar-lmc-lazy-eval-lmc":
-    ["--action-elimination-planner-config", "--evaluator", "lmc=lmcount(lm_merged([lm_rhw(), lm_hm(m=1)]), admissible=true, cost_partitioning=suboptimal, reuse_costs=true, greedy=true)", "--search", "astar(lmc, lazy_evaluator=lmc)"],
-    "astar-bjolp":
-    ["--action-elimination-planner-config", "--evaluator", "lmc=lmcount(lm_merged([lm_rhw(),lm_hm(m=1)]),admissible=true)", "--search", "astar(lmc,lazy_evaluator=lmc)"],
+    # "astar-lmcut":
+    # ["--action-elimination-planner-config", "--search", "astar(lmcut())"],
+    # "astar-lmc-lazy-eval-lmc":
+    # ["--action-elimination-planner-config", "--evaluator", "lmc=lmcount(lm_merged([lm_rhw(), lm_hm(m=1)]), admissible=true, cost_partitioning=suboptimal, reuse_costs=true, greedy=true)", "--search", "astar(lmc, lazy_evaluator=lmc)"],
+    # "astar-bjolp":
+    # ["--action-elimination-planner-config", "--evaluator", "lmc=lmcount(lm_merged([lm_rhw(),lm_hm(m=1)]),admissible=true)", "--search", "astar(lmc,lazy_evaluator=lmc)"],
     # "sys-scp-cartesian":
     # ["--action-elimination-planner-config", "--search", "astar(scp_online([projections(sys_scp(max_time=1, max_time_per_restart=0.2)), cartesian([goals()], max_time=1)], saturator=perimstar, max_time=1, interval=10K))"],
     # "sys-scp":
@@ -114,13 +114,16 @@ if args.process_number != -1:
         domain_number = domain_number - len(SUITE_IPC2014)
         SUITE_IPC2014 = []
         SUITE_IPC2018 = [SUITE_IPC2018[domain_number]]
-        current_config = list(CONFIGS.keys())[config_number]
+        current_config = sorted(list(CONFIGS.keys()))[config_number]
         CONFIGS = {current_config : CONFIGS[current_config]}
     else:
         SUITE_IPC2018 = []
         SUITE_IPC2014 = [SUITE_IPC2014[domain_number]]
-        current_config = list(CONFIGS.keys())[config_number]
+        current_config = sorted(list(CONFIGS.keys()))[config_number]
         CONFIGS = {current_config : CONFIGS[current_config]}
+
+print("The domains are: ", SUITE_IPC2014, SUITE_IPC2018)
+print("The configs are: ", CONFIGS)
 
 exp = Experiment(environment=ENV)
 for rev, rev_nick in REVS:

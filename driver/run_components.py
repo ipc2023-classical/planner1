@@ -247,14 +247,11 @@ def run_eliminate_actions(args):
     cmd = [sys.executable, action_elimination] + ae_options + ["-t", args.sas_file, "-p", last_plan_file]
     logging.info("Creating action elimination task.")
     try:
-        create_task_time = time.time()
         call.check_call(
             "action-elimination",
             cmd,
             time_limit=time_limit,
             memory_limit=memory_limit)
-        create_task_time = time.time() - create_task_time
-        logging.info(f"Create AE task time: {create_task_time:3f}")
     except subprocess.CalledProcessError as err:
         print("Error while eliminating actions.", file=sys.stderr)
         return err.returncode, False
@@ -272,7 +269,6 @@ def run_eliminate_actions(args):
                 memory_limit=memory_limit)
         ae_planner_call_time = time.time() - ae_planner_call_time
         logging.info(f"AE planner call time: {ae_planner_call_time:3f}")
-        logging.info(f"Total AE time: {ae_planner_call_time + create_task_time:3f}")
     except subprocess.CalledProcessError as err:
             assert err.returncode >= 10 or err.returncode < 0, "got returncode < 10: {}".format(err.returncode)
             return (err.returncode, False)
