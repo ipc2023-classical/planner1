@@ -36,14 +36,10 @@ JAVA_ARGUMENTS = [
 ]
 
 # Define problems to be solved
-SUITE_IPC2014 = [name for name in os.listdir(BENCHMARKS_2014_DIR)
-            if os.path.isdir(os.path.join(BENCHMARKS_2014_DIR, name))]
-SUITE_IPC2018 = [name for name in os.listdir(BENCHMARKS_2018_DIR)
-            if os.path.isdir(os.path.join(BENCHMARKS_2018_DIR, name))]
-
-# TODO single domain for a local test. Remember to change to all the domains
-SUITE_IPC2014 = ["tetris"]
-SUITE_IPC2018 = []
+SUITE_IPC2014 = sorted([name for name in os.listdir(BENCHMARKS_2014_DIR)
+            if os.path.isdir(os.path.join(BENCHMARKS_2014_DIR, name))])
+SUITE_IPC2018 = sorted([name for name in os.listdir(BENCHMARKS_2018_DIR)
+            if os.path.isdir(os.path.join(BENCHMARKS_2018_DIR, name))])
 
 ENV = project.LocalEnvironment(processes=1)
 TIME_LIMIT = 1800
@@ -103,7 +99,7 @@ for planner_name in PLANNER_NAMES:
                     run = exp.add_run()
                     run.add_command(
                         "solve",
-                        JAVA_ARGUMENTS + [sas_file, plan_file, cnf_file],
+                        JAVA_ARGUMENTS + ["output.sas", "sas_plan1", cnf_file],
                         time_limit=TIME_LIMIT,
                         memory_limit=MEMORY_LIMIT,
                         hard_stdout_limit=None,
@@ -150,7 +146,7 @@ for planner_name in PLANNER_NAMES:
                     run = exp.add_run()
                     run.add_command(
                         "solve",
-                        JAVA_ARGUMENTS + [sas_file, plan_file, cnf_file],
+                        JAVA_ARGUMENTS + ["output.sas", "sas_plan.1", cnf_file],
                         time_limit=TIME_LIMIT,
                         memory_limit=MEMORY_LIMIT,
                         hard_stdout_limit=None,
