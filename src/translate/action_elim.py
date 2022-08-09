@@ -288,8 +288,11 @@ def main():
         parser.print_help()
         sys.exit(2)
 
+    parse_input_sas_time = time()
     task, operator_name_to_index_map = parse_task(options.task)
     plan, plan_cost = parse_plan(options.plan)
+    parse_input_sas_time = time() - parse_input_sas_time
+    print(f"Parse input SAS task and plan time: {parse_input_sas_time:3f}")
 
     # Measure create task time
     create_task_time = time()

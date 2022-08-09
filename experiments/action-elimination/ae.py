@@ -89,6 +89,7 @@ ATTRIBUTES = [
     "error",
     "planner_time",
     "ae_planner_call_time",
+    "parse_input_sas_and_plan",
     "ae_total_time",
     "old_cost",
     "new_cost",
