@@ -1,4 +1,5 @@
 from pddl.actions import Action
+from .conditions import NegatedAtom
 from . import axioms
 from . import predicates
 from . import f_expression
@@ -59,7 +60,7 @@ class Task:
             for axiom in self.axioms:
                 axiom.dump()
 
-                
+
 #--------- RIA NEW METHODS -------------------------------------------------------------
 # Added 19/11/21 by Raquel Fuentetaja
     def add_type(self, type_name):
@@ -85,7 +86,7 @@ class Task:
 
     def add_action(self, action):
         self.actions.append(action)
-    
+
     def save_domain_pddl(self, filename):
         indent = "   "
         with open(filename, 'w') as result_file:
@@ -138,26 +139,26 @@ class Task:
                 action.save_pddl(result_file, indent, self)
 
             print (")", file = result_file)
-            
+
     def save_problem_pddl(self, file_name):
         indent = "   "
         stream = open(file_name, "w")
 
-        print ("(define (problem %s) " % self.task_name, file = stream) 
-        print (indent, "(:domain %s) " % self.domain_name, file = stream) 
-        
-        print (indent, "(:objects ", file = stream) 
-    
+        print ("(define (problem %s) " % self.task_name, file = stream)
+        print (indent, "(:domain %s) " % self.domain_name, file = stream)
+
+        print (indent, "(:objects ", file = stream)
+
         for ob in self.objects:
             print (indent, ob.name + " - " + ob.type_name, file = stream)
-        print (")", file = stream) 
+        print (")", file = stream)
 
         discard_preds = ['=']
-    
-        print (indent, "(:init ", file = stream) 
+
+        print (indent, "(:init ", file = stream)
         for literal in self.init:
             if type(literal) is not f_expression.Assign and literal.predicate not in discard_preds:
-                print (indent, "%s" % literal, file = stream) 
+                print (indent, "%s" % literal, file = stream)
             elif type(literal) is f_expression.Assign:
                 string = str(literal.fluent)
                 string = string[len("PNE "):]
@@ -165,13 +166,18 @@ class Task:
                 string = string.replace(",", " ")
                 string = "(= (" + string + " " + literal.expression.__str__()[len("NumericConstant "):] + ")"
                 print(indent, string, file = stream)
-        print (indent, ")", file = stream) 
-        print (indent, "(:goal (and ", file = stream)    
+        print (indent, ")", file = stream)
+        print (indent, "(:goal (and ", file = stream)
 
+        blank = " "
         for goal in self.goals():
-            print (indent, "%s" % goal, file = stream) 
-        print ("))", file = stream) 
-        
+            if isinstance(goal, NegatedAtom):
+                #print (indent, "%s" % goal, file = stream)
+                print(f"{indent}(not ({goal.predicate} {blank.join(goal.args)}))", file=stream)
+            else:
+                print (indent, "%s" % goal, file = stream)
+        print ("))", file = stream)
+
         if MINIMAL_COST or True:
             print("(:metric minimize (total-cost))", file = stream)
         print(")", file=stream)
@@ -180,10 +186,10 @@ class Task:
     def get_action_by_name(self, action_name):
         return next(action for action in self.actions if action.name == action_name)
 
-            
-    
-#--------- END RIA NEW METHODS -------------------------------------------------------------    
-                
+
+
+#--------- END RIA NEW METHODS -------------------------------------------------------------
+
 class Requirements:
     def __init__(self, requirements):
         self.requirements = requirements
