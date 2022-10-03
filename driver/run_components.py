@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import re
+import time
 
 from . import call
 from . import limits
@@ -245,7 +246,6 @@ def run_eliminate_actions(args):
     last_plan_file = plan_manager._get_plan_file(plan_manager.get_plan_counter())
     cmd = [sys.executable, action_elimination] + ae_options + ["-t", args.sas_file, "-p", last_plan_file]
     logging.info("Creating action elimination task.")
-
     try:
         call.check_call(
             "action-elimination",
@@ -260,12 +260,15 @@ def run_eliminate_actions(args):
     logging.info("Running search for action elimination task.")
 
     try:
+        ae_planner_call_time = time.time()
         call.check_call(
                 "search",
                 [executable] + planner_options,
                 stdin=ae_task_file,
                 time_limit=time_limit,
                 memory_limit=memory_limit)
+        ae_planner_call_time = time.time() - ae_planner_call_time
+        logging.info(f"AE planner call time: {ae_planner_call_time:3f}")
     except subprocess.CalledProcessError as err:
             assert err.returncode >= 10 or err.returncode < 0, "got returncode < 10: {}".format(err.returncode)
             return (err.returncode, False)

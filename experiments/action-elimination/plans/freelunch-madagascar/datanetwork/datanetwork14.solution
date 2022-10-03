@@ -138,3 +138,4 @@
 (save data-2-3 number4 server3)
 (save data-2-7 number4 server2)
 (send data-1-5 server7 server1 number2 number16 number14 number16)
+; cost = 1013 (general cost)

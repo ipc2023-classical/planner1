@@ -176,3 +176,4 @@
 (release data-1-26 server7 number4 number5 number1)
 (send data-2-7 server1 server7 number5 number8 number1 number6)
 (save data-2-7 number5 server7)
+; cost = 2922 (general cost)

@@ -101,3 +101,4 @@
 (process data-1-17 data-1-19 data-2-6 script16 server1 number1 number16 number15 number16)
 (send data-2-6 server1 server3 number1 number8 number7 number8)
 (save data-2-6 number1 server3)
+; cost = 840 (general cost)
