@@ -34,7 +34,7 @@ MR  = 'MR'
 MLR = 'MLR'
 
 # Clean domains as proposed by Jendrik (I think)
-def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, pos_var_to_goal):
+def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal):
     # Process operators. Later on, variable to maintain order of actions will be var_(n + 1) (n=num vars originally)
     print("Plan length:", len(plan))
     print("Unique operators in plan:", len(set(plan)))
@@ -71,7 +71,12 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
     new_mutexes = process_mutex_groups(sas_task.mutexes, vars_vals_map, relevant_facts)
 
     # Map goal values to new domains
-    new_goal = map_goal_vals(sas_task.goal, vars_vals_map, pos_var_to_goal, len(sas_task.variables.ranges), len(plan))
+    new_goal_facts = [(var, vars_vals_map[var][val]) for var, val in sas_task.goal.pairs]
+    if add_pos_to_goal:
+        pos_goal_fact = (len(sas_task.variables.ranges), len(plan))
+        new_goal = SASGoal(new_goal_facts + [pos_goal_fact])
+    else:
+        new_goal = SASGoal(new_goal_facts)
 
     # Map axioms
     new_axioms = process_axioms(sas_task.axioms)
@@ -217,11 +222,6 @@ def process_axioms(axioms):
     # TODO use axioms!
     return []
 
-# One liner without multiple uses. Might refactor
-def map_goal_vals(goal, vars_vals_map, pos_var_to_goal, pos_var_number, pos_var_value):
-    return SASGoal(pairs=[(var, vars_vals_map[var][val]) for var, val in goal.pairs] + [(pos_var_number, pos_var_value)]) if pos_var_to_goal \
-        else SASGoal(pairs=[(var, vars_vals_map[var][val]) for var, val in goal.pairs])
-
 # With a task and a plan, finds trivially necessary actions in the plan. (related to landmarks)
 # When solving MR and MLR (action order maintained), trivially necessary actions are those that cannot be skipped.
 # Either because they are the only action that achieves a goal
@@ -278,7 +278,7 @@ def main():
     required_named.add_argument('-p', '--plan', help='Path to plan file.', type=str, required=True)
     parser.add_argument('-s', '--subsequence', help='Compiled task must guarantee maintaining order of original actions', action='store_true', default=False)
     parser.add_argument('-e', '--enhanced', help='Compiled task only creates skip actions for skippable actions', action='store_true', default=False)
-    parser.add_argument('-pg', '--pos-on-goal', help='Add position variable to goals', action='store_true', default=False)
+    parser.add_argument('-pg', '--add-pos-to-goal', help='Add position variable to goals', action='store_true', default=False)
     parser.add_argument('-r', '--reduction', help='MR or MLR. MR=minimal reduction, MLR=minimal length reduction',type=str, default=MR)
     # Remove -f option for simplicity. Might want to add this again later
     # parser.add_argument('-f', '--file', help='Output file where reformulated SAS+ will be stored',type=str,default='minimal-reduction.sas')
@@ -298,7 +298,7 @@ def main():
 
     # Measure create task time
     create_task_time = time()
-    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, options.enhanced, options.reduction, options.pos_on_goal)
+    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, options.enhanced, options.reduction, options.add_pos_to_goal)
     with open(os.path.join(options.directory, options.file), mode='w') as output_file:
         new_task.output(stream=output_file)
 
