@@ -34,7 +34,7 @@ MR  = 'MR'
 MLR = 'MLR'
 
 # Clean domains as proposed by Jendrik (I think)
-def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal):
+def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal, enhanced_fix_point):
     # Process operators. Later on, variable to maintain order of actions will be var_(n + 1) (n=num vars originally)
     print("Plan length:", len(plan))
     print("Unique operators in plan:", len(set(plan)))
@@ -43,7 +43,7 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
     triv_nec = [False] * len(plan)
     if ordered and enhanced:
         # Find triv. neccessary actions. Operators have same order as original plan!
-        triv_nec = find_triv_nec_actions(sas_task.init, sas_task.goal, sas_task.variables, new_operators)
+        triv_nec = find_triv_nec_actions(sas_task.init, sas_task.goal, sas_task.variables, new_operators, enhanced_fix_point)
 
     # Find relevant facts for action elim task
     relevant_facts = find_relevant_facts(sas_task, plan, operator_name_to_index)
@@ -226,18 +226,19 @@ def process_axioms(axioms):
 # When solving MR and MLR (action order maintained), trivially necessary actions are those that cannot be skipped.
 # Either because they are the only action that achieves a goal
 # Or because they are the only action that achieves a precondition for another triv. nec. action
-def find_triv_nec_actions(init, goal, variables, plan):
+def find_triv_nec_actions(init, goal, variables, plan, reach_fix_point):
     # Find achievers for each fact
     fact_achievers = [[[] for _ in range(dom_size)] for dom_size in variables.ranges]
 
     # Facts achieved by the initial state
     for var, val in enumerate(init.values):
-        fact_achievers[var][val].append(-1)
+        fact_achievers[var][val].append([-1, len(plan) + 2])
 
     # For each operator what facts they achieve
     for index, op in enumerate(plan):
         for var, _, new_val, _  in op.pre_post:
-            fact_achievers[var][new_val].append(index)
+            # Keeping track of until when a value is true. When a new triv. nec. action is found this value might be updated
+            fact_achievers[var][new_val].append([index, len(plan) + 2])
 
     # Add virtual goal action. prevail is goal conditions, used for ease of implementation
     virtual_goal_action = SASOperator(name='virtual_goal', prevail=[(var, val) for var, val in goal.pairs], pre_post=[], cost=0)
@@ -246,23 +247,36 @@ def find_triv_nec_actions(init, goal, variables, plan):
     extended_plan.append(virtual_goal_action)
     triv_nec = [False for _ in extended_plan]
     triv_nec[-1] = True
+    is_fix_point = False
 
-    # Check, in reverse order, for trivially nec actions
-    for op_index in range(len(extended_plan) - 1, -1, -1):
-        # If current act is triv. nec, its' preconds are nec.domain
-        if triv_nec[op_index]:
-            current_op = extended_plan[op_index]
-            for var, val in current_op.prevail:
-                # If one pre has only one achiever that is not the initial state, that achiever is nec!
-                if sum(1 for achiever in fact_achievers[var][val] if achiever < op_index) < 2:
-                    if fact_achievers[var][val][0] > -1:
-                        triv_nec[fact_achievers[var][val][0]] = True
+    while not is_fix_point:
+        is_fix_point = True
+        # Check, in reverse order, for trivially nec actions
+        for op_index in range(len(extended_plan) - 1, -1, -1):
+            # If current act is triv. nec, its' preconds are nec.domain
+            if triv_nec[op_index]:
+                current_op = extended_plan[op_index]
+                for var, val in current_op.prevail:
+                    # Find achievers for current precondition at current plan step.
+                    current_achievers = [achiever[0] for achiever in fact_achievers[var][val] if achiever[0] < op_index and achiever[1] >= op_index]
+                    if len(current_achievers) < 2:
+                        # If the achiever is not the initial state, new triv. nec. action
+                        if current_achievers[0] > -1 and not triv_nec[current_achievers[0]]:
+                            triv_nec[current_achievers[0]] = True
+                            if reach_fix_point:
+                                update_achievers(current_achievers[0], extended_plan[current_achievers[0]], fact_achievers)
+                                is_fix_point = False
 
-            for var, val, _, _ in current_op.pre_post:
-                # If one pre has only one achiever that is not the initial state, that achiever is nec!
-                if val > -1 and sum(1 for achiever in fact_achievers[var][val] if achiever < op_index) < 2:
-                    if fact_achievers[var][val][0] > -1:
-                       triv_nec[fact_achievers[var][val][0]] = True
+                for var, val, _, _ in current_op.pre_post:
+                    # If one pre has only one achiever that is not the initial state, that achiever is nec!
+                    current_achievers = [achiever[0] for achiever in fact_achievers[var][val] if achiever[0] < op_index and achiever[1] >= op_index]
+                    if val > -1 and len(current_achievers) < 2:
+                        # If the achiever is not the initial state, new triv. nec. action
+                        if current_achievers[0] > -1 and not triv_nec[current_achievers[0]]:
+                            triv_nec[current_achievers[0]] = True
+                            if reach_fix_point:
+                                update_achievers(current_achievers[0], extended_plan[current_achievers[0]], fact_achievers)
+                                is_fix_point = False
 
     # TODO This can be done iteratively to identify more nec. actions
     # Once you identify a triv. nec action you can delete achievers from the list.
@@ -270,6 +284,22 @@ def find_triv_nec_actions(init, goal, variables, plan):
     # of a value for that variable are no longer achievers for indices > i
     # What's the worst case complexity? Is it worth it?
     return triv_nec
+
+# When a new triv. nec. action was found, update the fact achievers
+# Using prepost the triv. nec. operator, change until when each achiever
+# is actually an achiever.
+def update_achievers(triv_nec_op_index, triv_nec_op, fact_achievers):
+    # For each variable in the pre_post
+    for var, _, _, _ in triv_nec_op.pre_post:
+        # For each val of the var
+        for var_value in fact_achievers[var]:
+            # For each achiever of the val
+            for achiever in var_value:
+                # If the op. index is greater than operator used to update, break (ordered list)
+                if achiever[0] >= triv_nec_op_index:
+                    break
+                # Else, update the last index in which this operator is an achiever for this var=val
+                achiever[1] = triv_nec_op_index
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawTextHelpFormatter)
@@ -279,6 +309,7 @@ def main():
     parser.add_argument('-s', '--subsequence', help='Compiled task must guarantee maintaining order of original actions', action='store_true', default=False)
     parser.add_argument('-e', '--enhanced', help='Compiled task only creates skip actions for skippable actions', action='store_true', default=False)
     parser.add_argument('-pg', '--add-pos-to-goal', help='Add position variable to goals', action='store_true', default=False)
+    parser.add_argument('-fp', '--enhanced-fix-point', help='Iteratively find triv. nec. actions until a fixpoint is reached', action='store_true', default=False)
     parser.add_argument('-r', '--reduction', help='MR or MLR. MR=minimal reduction, MLR=minimal length reduction',type=str, default=MR)
     # Remove -f option for simplicity. Might want to add this again later
     # parser.add_argument('-f', '--file', help='Output file where reformulated SAS+ will be stored',type=str,default='minimal-reduction.sas')
@@ -298,7 +329,7 @@ def main():
 
     # Measure create task time
     create_task_time = time()
-    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, options.enhanced, options.reduction, options.add_pos_to_goal)
+    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, options.enhanced, options.reduction, options.add_pos_to_goal, options.enhanced_fix_point)
     with open(os.path.join(options.directory, options.file), mode='w') as output_file:
         new_task.output(stream=output_file)
 
