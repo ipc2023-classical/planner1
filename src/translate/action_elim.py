@@ -167,6 +167,9 @@ def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ord
     for op_index, op in enumerate(operators):
         # Remove triv. unnec. operators
         if triv_unnec[op_index]:
+            # Include ONLY a skip actions to avoid messing with the pos_var values.
+            # TODO: should we change this?
+            processed_operators.append(SASOperator(name='(skip-action plan-pos-%i)' % op_index, prevail=[], pre_post=[(ordered_var, op_index, op_index + 1, [])], cost=0))
             continue
 
         # Might not need to check if prevail is relevant -- was set as relevant before
