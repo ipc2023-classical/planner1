@@ -386,9 +386,6 @@ def main():
     parse_input_sas_time = time()
     task, operator_name_to_index_map = parse_task(options.task)
     plan, plan_cost = parse_plan(options.plan)
-    #task.operators.append(SASOperator(name='dummy', prevail=[], pre_post=[], cost=0))
-    #plan= ['dummy'] + plan
-    #operator_name_to_index_map['dummy'] = len(plan) - 1
     parse_input_sas_time = time() - parse_input_sas_time
     print(f"Parse input SAS task and plan time: {parse_input_sas_time:3f}")
 
