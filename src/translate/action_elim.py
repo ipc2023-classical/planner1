@@ -34,16 +34,20 @@ MR  = 'MR'
 MLR = 'MLR'
 
 # Clean domains as proposed by Jendrik (I think)
-def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal, enhanced_fix_point):
+def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal, enhanced_fix_point, enhanced_unnecessary):
     # Process operators. Later on, variable to maintain order of actions will be var_(n + 1) (n=num vars originally)
     print("Plan length:", len(plan))
     print("Unique operators in plan:", len(set(plan)))
     new_operators = get_operators_from_plan(sas_task.operators, plan, operator_name_to_index, ordered)
 
     triv_nec = [False] * len(plan)
+    triv_unnec = [False] * len(plan)
+    fact_achievers = []
     if ordered and enhanced:
         # Find triv. neccessary actions. Operators have same order as original plan!
-        triv_nec = find_triv_nec_actions(sas_task.init, sas_task.goal, sas_task.variables, new_operators, enhanced_fix_point)
+        triv_nec, fact_achievers = find_triv_nec_actions(sas_task.init, sas_task.goal, sas_task.variables, new_operators, enhanced_fix_point)
+        if enhanced_unnecessary:
+            triv_unnec = find_triv_unnec_actions(sas_task.init, sas_task.goal, sas_task.variables, new_operators, triv_nec, fact_achievers)
 
     # Find relevant facts for action elim task
     relevant_facts = find_relevant_facts(sas_task, plan, operator_name_to_index)
@@ -62,7 +66,7 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
     # Should we look into this, or assume no one is going to call the reformulation with a task/plan obtained from the reformulation?
     # TODO: Let's not rename for now.
     # Map operators variable values to new domains
-    new_operators = process_operators(new_operators, relevant_facts, vars_vals_map, new_variables, ordered, new_metric, triv_nec)
+    new_operators = process_operators(new_operators, relevant_facts, vars_vals_map, new_variables, ordered, new_metric, triv_nec, triv_unnec)
 
     # Map init values to new domains
     new_init = process_init(sas_task.init, vars_vals_map, relevant_facts, new_variables, ordered)
@@ -156,11 +160,15 @@ def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
     return SASVariables(ranges=new_ranges, axiom_layers=new_axiom_layers, value_names=new_value_names)\
            , vars_new_vals_map
 
-def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ordered, use_costs, triv_nec):
+def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ordered, use_costs, triv_nec, triv_unnec):
     processed_operators = []
     # Variable to maintain order is ALWAYS the last variable
     ordered_var = len(variables.ranges) - 1
     for op_index, op in enumerate(operators):
+        # Remove triv. unnec. operators
+        if triv_unnec[op_index]:
+            continue
+
         # Might not need to check if prevail is relevant -- was set as relevant before
         new_prev = [(var, vars_vals_map[var][val]) for var, val in op.prevail if is_fact_relevant[var][val]]
         new_pre_post = [(var, old_val if old_val == -1 else vars_vals_map[var][old_val], \
@@ -283,7 +291,7 @@ def find_triv_nec_actions(init, goal, variables, plan, reach_fix_point):
     # If one action with index i is nec, and changes the value of a variable, all achievers
     # of a value for that variable are no longer achievers for indices > i
     # What's the worst case complexity? Is it worth it?
-    return triv_nec
+    return triv_nec, fact_achievers
 
 # When a new triv. nec. action was found, update the fact achievers
 # Using prepost the triv. nec. operator, change until when each achiever
@@ -299,7 +307,57 @@ def update_achievers(triv_nec_op_index, triv_nec_op, fact_achievers):
                 if achiever[0] >= triv_nec_op_index:
                     break
                 # Else, update the last index in which this operator is an achiever for this var=val
-                achiever[1] = triv_nec_op_index
+                achiever[1] = min(triv_nec_op_index, achiever[1])
+
+# Finds triv. unnec. actions.
+def find_triv_unnec_actions(init, goal, variables, plan, triv_nec, fact_achievers):
+    # Add virtual goal action. prevail is goal conditions, used for ease of implementation
+    virtual_goal_action = SASOperator(name='virtual_goal', prevail=[(var, val) for var, val in goal.pairs], pre_post=[], cost=0)
+    # Extended plan for ease of implementation
+    extended_plan = plan[:]
+    extended_plan.append(virtual_goal_action)
+
+    # For each action (index) what actions (possibly) consume its' effects on a variable
+    producer_consumer = [set() for _ in extended_plan]
+
+    # Keep track of variables overwritten by triv. nec. actions
+    fact_overwritten = [[] for _ in variables.ranges]
+    triv_unnec = [False for _ in extended_plan]
+
+    for index, op in enumerate(extended_plan):
+        for var, old_val, new_val, _  in op.pre_post:
+            if triv_nec[index]:
+                fact_overwritten[var].append(index)
+            # All posible producers of this preconditon
+            if old_val > -1:
+                # For each operator, which values it produces are read by what other operators
+                for producer_index in fact_achievers[var][old_val]:
+                    if producer_index[0] > -1 and producer_index[0] < index <= producer_index[1]:
+                        producer_consumer[producer_index[0]].add((index, var))
+
+        for var, val in op.prevail:
+            for producer_index in fact_achievers[var][val]:
+                if producer_index[0] > -1 and producer_index[0] < index <= producer_index[1]:
+                    producer_consumer[producer_index[0]].add((index, var))
+
+    # Check, in reverse order, for trivially unnec. actions
+    for op_index in range(len(extended_plan) - 1, -1, -1):
+        if triv_nec[op_index]:
+            # Triv nec actions cannot be triv. unnec.
+            continue
+
+        # All effects are only  read by other triv. unnec. actions. This covers the "not read by any action", too (vacuous truth).
+        is_unnec = all(triv_unnec[consumer[0]] for consumer in producer_consumer[op_index])
+
+        if not is_unnec:
+            is_unnec = True
+            for consumer_index, var in producer_consumer[op_index]:
+                # For each consumer, at least one triv. nec. action overwrites the var before it's read!
+                is_unnec &= any(op_index < over_writer < consumer_index for over_writer in fact_overwritten[var])
+
+        triv_unnec[op_index] = is_unnec
+
+    return triv_unnec
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawTextHelpFormatter)
@@ -308,6 +366,7 @@ def main():
     required_named.add_argument('-p', '--plan', help='Path to plan file.', type=str, required=True)
     parser.add_argument('-s', '--subsequence', help='Compiled task must guarantee maintaining order of original actions', action='store_true', default=False)
     parser.add_argument('-e', '--enhanced', help='Compiled task only creates skip actions for skippable actions', action='store_true', default=False)
+    parser.add_argument('-eu', '--enhanced-unnecessary', help='Compiled task only includes actions that are not trivially unnecessary', action='store_true', default=False)
     parser.add_argument('-pg', '--add-pos-to-goal', help='Add position variable to goals', action='store_true', default=False)
     parser.add_argument('-fp', '--enhanced-fix-point', help='Iteratively find triv. nec. actions until a fixpoint is reached', action='store_true', default=False)
     parser.add_argument('-r', '--reduction', help='MR or MLR. MR=minimal reduction, MLR=minimal length reduction',type=str, default=MR)
@@ -324,12 +383,15 @@ def main():
     parse_input_sas_time = time()
     task, operator_name_to_index_map = parse_task(options.task)
     plan, plan_cost = parse_plan(options.plan)
+    #task.operators.append(SASOperator(name='dummy', prevail=[], pre_post=[], cost=0))
+    #plan= ['dummy'] + plan
+    #operator_name_to_index_map['dummy'] = len(plan) - 1
     parse_input_sas_time = time() - parse_input_sas_time
     print(f"Parse input SAS task and plan time: {parse_input_sas_time:3f}")
 
     # Measure create task time
     create_task_time = time()
-    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, options.enhanced, options.reduction, options.add_pos_to_goal, options.enhanced_fix_point)
+    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, options.enhanced, options.reduction, options.add_pos_to_goal, options.enhanced_fix_point, options.enhanced_unnecessary)
     with open(os.path.join(options.directory, options.file), mode='w') as output_file:
         new_task.output(stream=output_file)
 
