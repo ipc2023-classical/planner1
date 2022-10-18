@@ -34,7 +34,7 @@ MR  = 'MR'
 MLR = 'MLR'
 
 # Clean domains as proposed by Jendrik (I think)
-def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal, enhanced_fix_point, enhanced_unnecessary):
+def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal, enhanced_fix_point, enhanced_unnecessary, use_macro_ops):
     # Process operators. Later on, variable to maintain order of actions will be var_(n + 1) (n=num vars originally)
     print("Plan length:", len(plan))
     print("Unique operators in plan:", len(set(plan)))
@@ -59,12 +59,11 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
     # For MLR we do not need costs if permutations are allowed
     new_metric = ordered or (reduction == MR and sas_task.metric)
 
-    # TODO: should we 'rename' operators when including the order variable?
-    # example: (action x y z ordering-variable)
-    # Since we are not renaming, when calling the reformulation for an already reformulated task,
-    # we get operators with the exact same name but differect preconditions, which eventually leads to an exception.
-    # Should we look into this, or assume no one is going to call the reformulation with a task/plan obtained from the reformulation?
-    # TODO: Let's not rename for now.
+    # Create macro operators from triv. nec. actions streaks
+    if use_macro_ops:
+        new_operators = process_macro_operators(new_operators, triv_nec, triv_unnec)
+        print(f"Number of op withtout macro op: {len(plan)}. Numb of ops with macros: {len(new_operators)}")
+
     # Map operators variable values to new domains
     new_operators = process_operators(new_operators, relevant_facts, vars_vals_map, new_variables, ordered, new_metric, triv_nec, triv_unnec)
 
@@ -104,6 +103,96 @@ def get_operators_from_plan(operators, plan, operator_name_to_index, ordered):
         # added.add(op) is only used for its' side effects.
         # set.add(x) always returns None so it doesn't affect the condition
         return [operators[operator_name_to_index[op]] for op in plan if not (op in added or added.add(op))]
+
+# Given information about triv. nec. actions, create macro operators for streaks of consecutive triv. nec. actions in plan
+# Only makes sense when maintaining order of actions in input plan
+def process_macro_operators(plan, triv_nec, triv_unnec):
+    # Number of operators composing current macro operator
+    op_count = 0
+
+    # Macro-operator string
+    MACRO_OP_STRING = " triv-nec-macro "
+
+    # Prevail and pre_post of current macro operator
+    # Should we use lists for this?
+    current_prev = {}
+    current_pre_post = {}
+    new_name = ""
+    current_cost = 0
+
+    # Operators after creating the macro-operators
+    new_operators = []
+
+    # Update triv. nec. and unnec. actions with new action indices
+    new_triv_nec = []
+    new_triv_unnec = []
+
+    for index, op in enumerate(plan):
+        if triv_nec[index]:
+            # If no streak of triv. nec. actions, do not process operator for new macro op.
+            if op_count < 1 and not triv_nec[index + 1]:
+                op_count = 1
+                continue
+
+            # First needed precond. for a variable is the precond. for the macro op.
+            for var, val in op.prevail:
+                if var not in current_prev and var not in current_pre_post:
+                    current_prev[var] = (var, val)
+
+            # Keep last effect and first precond. for each var
+            for var, old_val, new_val, cond_effects in op.pre_post:
+                old_prev = current_prev.get(var)
+                old_pre_post = current_pre_post.get(var)
+                if old_prev is not None:
+                    # Keep original precondition and update effects
+                    current_pre_post[var] = (var, old_prev[1], new_val, cond_effects)
+                    del current_prev[var]
+                elif old_pre_post is not None:
+                    # Keep original precondition and update effects
+                    current_pre_post[var] = (var, old_pre_post[1], new_val, cond_effects)
+                else:
+                    # New precond and affects
+                    current_pre_post[var] = (var, old_val, new_val, cond_effects)
+
+            new_name += f"{MACRO_OP_STRING}{op.name.lstrip('(').rstrip(')')}"
+            current_cost += op.cost
+            op_count += 1
+        else:
+            # If macro operator was created
+            if op_count > 1:
+                new_operators.append(SASOperator(f"({new_name})", list(current_prev.values()), list(current_pre_post.values()), current_cost))
+                current_prev.clear()
+                current_pre_post.clear()
+                new_name = ""
+                current_cost = 0
+                new_triv_nec.append(True)
+                new_triv_unnec.append(False)
+
+            # If last act. is triv. nec. but no macro was created
+            if op_count == 1:
+                new_operators.append(plan[index - 1])
+                new_triv_nec.append(True)
+                new_triv_unnec.append(False)
+
+            op_count = 0
+            # Current op. is not triv. nec. add without changing it
+            new_operators.append(op)
+            new_triv_nec.append(False)
+            new_triv_unnec.append(triv_unnec[index])
+
+
+    if current_pre_post:
+        new_operators.append(SASOperator(f"({new_name})", list(current_prev.values()), list(current_pre_post.values()), current_cost))
+        new_triv_nec.append(True)
+        new_triv_unnec.append(False)
+
+    triv_nec[:] = new_triv_nec
+    triv_unnec[:] = new_triv_unnec
+
+    print(f"Number of triv. unnec. actions: {sum(1 for elem in triv_unnec if elem)}")
+
+    return new_operators
+
 
 def find_relevant_facts(sas_task, operators, operator_name_to_index):
     is_fact_relevant = [[False] * domain_size for domain_size in sas_task.variables.ranges]
@@ -178,24 +267,11 @@ def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ord
                         vars_vals_map[var][new_val] if is_fact_relevant[var][new_val] else variables.ranges[var] - 1, cond) \
                         for var, old_val, new_val, cond in op.pre_post]
 
-        # Readable code. Should do the same as the list comprehension. I-ll leave it here so we can choose
-        #readable_new_prev = []
-        #for var, val in op.prevail:
-        #    if is_fact_relevant[var][val]:
-        #        readable_new_prev.append((var, vars_vals_map[var][val]))
-        #
-        #readable_pre_post = []
-        #for var, old_val, new_val, cond in op.pre_post:
-        #    mapped_old = -1 if old_val == -1 else vars_vals_map[var][old_val]
-        #    mapped_new = vars_vals_map[var][new_val] if is_fact_relevant[var][new_val] else variables.ranges[var] - 1
-        #    readable_pre_post.append((var, mapped_old, mapped_new, cond))
-
         # Add ordered constraint pre_post
         if ordered:
             new_pre_post.append((ordered_var, op_index, op_index + 1, []))
             # Only actions that are not triv. nec can be skipped
             if not triv_nec[op_index]:
-                # We are assuming the input domain does not have action 'skip-action'. Should we think of a better name for this action?
                 processed_operators.append(SASOperator(name='(skip-action plan-pos-%i)' % op_index, prevail=[], pre_post=[(ordered_var, op_index, op_index + 1, [])], cost=0))
 
         # For MLR we need op_cost of 1 and skip actions of cost=0
@@ -289,11 +365,6 @@ def find_triv_nec_actions(init, goal, variables, plan, reach_fix_point):
                                 update_achievers(current_achievers[0], extended_plan[current_achievers[0]], fact_achievers)
                                 is_fix_point = False
 
-    # TODO This can be done iteratively to identify more nec. actions
-    # Once you identify a triv. nec action you can delete achievers from the list.
-    # If one action with index i is nec, and changes the value of a variable, all achievers
-    # of a value for that variable are no longer achievers for indices > i
-    # What's the worst case complexity? Is it worth it?
     return triv_nec, fact_achievers
 
 # When a new triv. nec. action was found, update the fact achievers
@@ -369,6 +440,7 @@ def main():
     required_named.add_argument('-p', '--plan', help='Path to plan file.', type=str, required=True)
     parser.add_argument('-s', '--subsequence', help='Compiled task must guarantee maintaining order of original actions', action='store_true', default=False)
     parser.add_argument('-e', '--enhanced', help='Compiled task only creates skip actions for skippable actions', action='store_true', default=False)
+    parser.add_argument('-m', '--macro-operators', help='Compiled task only creates macro operators for streaks of triv. nec. actions', action='store_true', default=False)
     parser.add_argument('-eu', '--enhanced-unnecessary', help='Compiled task only includes actions that are not trivially unnecessary', action='store_true', default=False)
     parser.add_argument('-pg', '--add-pos-to-goal', help='Add position variable to goals', action='store_true', default=False)
     parser.add_argument('-fp', '--enhanced-fix-point', help='Iteratively find triv. nec. actions until a fixpoint is reached', action='store_true', default=False)
@@ -391,7 +463,11 @@ def main():
 
     # Measure create task time
     create_task_time = time()
-    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, options.enhanced, options.reduction, options.add_pos_to_goal, options.enhanced_fix_point, options.enhanced_unnecessary)
+    new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, \
+                                       options.enhanced, options.reduction, options.add_pos_to_goal, \
+                                       options.enhanced_fix_point, options.enhanced_unnecessary,\
+                                       options.macro_operators)
+
     with open(os.path.join(options.directory, options.file), mode='w') as output_file:
         new_task.output(stream=output_file)
 
