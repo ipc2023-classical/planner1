@@ -49,20 +49,22 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
         if enhanced_unnecessary:
             triv_unnec = find_triv_unnec_actions(sas_task.init, sas_task.goal, sas_task.variables, new_operators, triv_nec, fact_achievers)
 
+        # Create macro operators from triv. nec. actions streaks
+        if use_macro_ops:
+            new_operators = process_macro_operators(new_operators, triv_nec, triv_unnec)
+            print(f"Number of op withtout macro-ops: {len(plan)}\nNumb of ops with macros: {len(new_operators)}")
+            plan_with_macros = new_operators
+
     # Find relevant facts for action elim task
-    relevant_facts = find_relevant_facts(sas_task, plan, operator_name_to_index)
+    relevant_facts = find_relevant_facts(sas_task, new_operators, operator_name_to_index)
 
     # Prune domains of variables to only contain relevant facts
-    new_variables, vars_vals_map = prune_irrelevant_domain_values(sas_task.variables, relevant_facts, plan, ordered)
+    new_variables, vars_vals_map = prune_irrelevant_domain_values(sas_task.variables, relevant_facts, new_operators, ordered)
 
     # We need action costs to maintain order of operators or if we want minimal reduction
     # For MLR we do not need costs if permutations are allowed
     new_metric = ordered or (reduction == MR and sas_task.metric)
 
-    # Create macro operators from triv. nec. actions streaks
-    if use_macro_ops:
-        new_operators = process_macro_operators(new_operators, triv_nec, triv_unnec)
-        print(f"Number of op withtout macro op: {len(plan)}. Numb of ops with macros: {len(new_operators)}")
 
     # Map operators variable values to new domains
     new_operators = process_operators(new_operators, relevant_facts, vars_vals_map, new_variables, ordered, new_metric, triv_nec, triv_unnec)
@@ -75,8 +77,8 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
 
     # Map goal values to new domains
     new_goal_facts = [(var, vars_vals_map[var][val]) for var, val in sas_task.goal.pairs]
-    if add_pos_to_goal:
-        pos_goal_fact = (len(sas_task.variables.ranges), len(plan))
+    if ordered and add_pos_to_goal:
+        pos_goal_fact = (len(sas_task.variables.ranges), len(plan)) if not use_macro_ops else (len(sas_task.variables.ranges), len(plan_with_macros))
         new_goal = SASGoal(new_goal_facts + [pos_goal_fact])
     else:
         new_goal = SASGoal(new_goal_facts)
@@ -180,7 +182,6 @@ def process_macro_operators(plan, triv_nec, triv_unnec):
             new_triv_nec.append(False)
             new_triv_unnec.append(triv_unnec[index])
 
-
     if current_pre_post:
         new_operators.append(SASOperator(f"({new_name})", list(current_prev.values()), list(current_pre_post.values()), current_cost))
         new_triv_nec.append(True)
@@ -201,8 +202,8 @@ def find_relevant_facts(sas_task, operators, operator_name_to_index):
         is_fact_relevant[var][val] = True
 
     # All facts in operator preconditions are needed.
-    for op_name in operators:
-        op = sas_task.operators[operator_name_to_index[op_name]]
+    for op in operators:
+        # op = sas_task.operators[operator_name_to_index[op_name]]
         for var, val in op.prevail:
             is_fact_relevant[var][val] = True
 
