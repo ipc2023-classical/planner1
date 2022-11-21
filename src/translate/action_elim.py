@@ -22,7 +22,7 @@ Allow reorder of actions in original plan call string:
 import argparse
 import os.path
 import sys
-from time import time
+from time import process_time
 
 from plan_parser import parse_plan
 from sas_parser import parse_task
@@ -315,6 +315,9 @@ def process_axioms(axioms):
 # Either because they are the only action that achieves a goal
 # Or because they are the only action that achieves a precondition for another triv. nec. action
 def find_triv_nec_actions(init, goal, variables, plan, reach_fix_point):
+    # Meassure time to identify triv. nec. actions
+    init_time = process_time()
+
     # Find achievers for each fact
     fact_achievers = [[[] for _ in range(dom_size)] for dom_size in variables.ranges]
 
@@ -366,6 +369,8 @@ def find_triv_nec_actions(init, goal, variables, plan, reach_fix_point):
                                 update_achievers(current_achievers[0], extended_plan[current_achievers[0]], fact_achievers)
                                 is_fix_point = False
 
+    print(f"Trivially necessary actions time: {process_time() - init_time:.3f}")
+    print(f"Number of triv. nec. actions: {sum(1 for elem in triv_nec if elem)}")
     return triv_nec, fact_achievers
 
 # When a new triv. nec. action was found, update the fact achievers
@@ -456,14 +461,14 @@ def main():
         parser.print_help()
         sys.exit(2)
 
-    parse_input_sas_time = time()
+    parse_input_sas_time = process_time()
     task, operator_name_to_index_map = parse_task(options.task)
     plan, plan_cost = parse_plan(options.plan)
-    parse_input_sas_time = time() - parse_input_sas_time
-    print(f"Parse input SAS task and plan time: {parse_input_sas_time:3f}")
+    parse_input_sas_time = process_time() - parse_input_sas_time
+    print(f"Parse input SAS task and plan time: {parse_input_sas_time:.3f}")
 
     # Measure create task time
-    create_task_time = time()
+    create_task_time = process_time()
     new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, \
                                        options.enhanced, options.reduction, options.add_pos_to_goal, \
                                        options.enhanced_fix_point, options.enhanced_unnecessary,\
@@ -472,7 +477,7 @@ def main():
     with open(os.path.join(options.directory, options.file), mode='w') as output_file:
         new_task.output(stream=output_file)
 
-    create_task_time = time() - create_task_time
-    print(f"Create AE task time: {create_task_time:3f}")
+    create_task_time = process_time() - create_task_time
+    print(f"Create AE task time: {create_task_time:.3f}")
 if __name__ == '__main__':
     main()
