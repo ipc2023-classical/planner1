@@ -290,8 +290,11 @@ def run_eliminate_actions(args):
     logging.info("New plan cost: %d" % plan_cost)
 
     # Write cleaned plan to file
-    with open(ae_plan_file, 'w') as found_plan:
-        found_plan.write("\n".join(cleaned_plan))
-        found_plan.write("\n")
+    if old_plan_cost > plan_cost:
+        with open(ae_plan_file, 'w') as found_plan:
+            found_plan.write("\n".join(cleaned_plan))
+            found_plan.write("\n")
+    else:
+        os.remove(ae_plan_file)
 
     return 0, True
