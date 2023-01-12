@@ -208,9 +208,17 @@ def run_validate(args):
 
 def run_eliminate_actions(args):
     def parse_plan_filter_skip_actions(planfile):
+        MACRO_OP_STRING = "triv-nec-macro"
+        SKIP_OP_STRING = "(skip-action plan-pos-"
         with open(planfile) as stream:
             lines = stream.readlines()
-        plan = [op.strip() for op in lines[:-1] if not op.startswith("(skip-action plan-pos-")]
+        plan = []
+        for op in lines[:-1]:
+            if op.startswith("(" + MACRO_OP_STRING):
+                # Kind of messy, might refactor
+                plan += list(map(lambda x: f"({x.strip().lstrip('(').rstrip(')').strip()})", op.split(MACRO_OP_STRING)))[1:]
+            elif not op.startswith(SKIP_OP_STRING):
+                plan.append(op.strip())
         total_cost = int(re.match(r"; cost = (\d+) \(.+ cost\)", lines[-1]).group(1))
         return plan, total_cost
 
@@ -282,8 +290,11 @@ def run_eliminate_actions(args):
     logging.info("New plan cost: %d" % plan_cost)
 
     # Write cleaned plan to file
-    with open(ae_plan_file, 'w') as found_plan:
-        found_plan.write("\n".join(cleaned_plan))
-        found_plan.write("\n")
+    if old_plan_cost > plan_cost:
+        with open(ae_plan_file, 'w') as found_plan:
+            found_plan.write("\n".join(cleaned_plan))
+            found_plan.write("\n")
+    else:
+        os.remove(ae_plan_file)
 
     return 0, True

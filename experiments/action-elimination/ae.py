@@ -38,8 +38,8 @@ REVISION_CACHE = "./data/revision-cache"
 ENV = project.LocalEnvironment(processes=1)
 
 HEURISTICS_MAP = {
-    "astar-blind":
-    ["--action-elimination-planner-config", "--search", "astar(blind())"],
+    # "astar-blind":
+    # ["--action-elimination-planner-config", "--search", "astar(blind())"],
     "astar-hmax":
     ["--action-elimination-planner-config", "--search", "astar(hmax())"],
     # "astar-lmcut":
@@ -60,7 +60,7 @@ HEURISTICS_MAP = {
     # ["--action-elimination-planner-config", "--search", "astar(scp_online([projections(systematic(3))], saturator=perimstar, max_time=1, interval=10K))"]
 }
 
-MR_ENHANCED_CONFIG = ["--action-elimination-options", "--reduction", "MR", "--subsequence", "--enhanced"]
+MR_ENHANCED_CONFIG = ["--action-elimination-options", "--reduction", "MR", "--subsequence", "--enhanced", "--macro-operators", "--enhanced-fix-point", "--add-pos-to-goal"]
 MR_CONFIG = ["--action-elimination-options", "--reduction", "MR", "--subsequence"]
 
 enhanced_configs = {
@@ -123,6 +123,8 @@ if args.process_number != -1:
         current_config = sorted(list(CONFIGS.keys()))[config_number]
         CONFIGS = {current_config : CONFIGS[current_config]}
 
+SUITE_IPC2014 = ["visitall"]
+SUITE_IPC2018 = []
 print("The domains are: ", SUITE_IPC2014, SUITE_IPC2018)
 print("The configs are: ", CONFIGS)
 
