@@ -63,11 +63,10 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
 
     # We need action costs to maintain order of operators or if we want minimal reduction
     # For MLR we do not need costs if permutations are allowed
-    new_metric = ordered or (reduction == MR and sas_task.metric)
-
+    use_action_costs = reduction == MR and sas_task.metric
 
     # Map operators variable values to new domains
-    new_operators = process_operators(new_operators, relevant_facts, vars_vals_map, new_variables, ordered, new_metric, triv_nec, triv_unnec)
+    new_operators = process_operators(new_operators, relevant_facts, vars_vals_map, new_variables, ordered, use_action_costs, triv_nec, triv_unnec)
 
     # Map init values to new domains
     new_init = process_init(sas_task.init, vars_vals_map, relevant_facts, new_variables, ordered)
@@ -87,7 +86,7 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
     new_axioms = process_axioms(sas_task.axioms)
 
     new_task = SASTask(variables=new_variables, mutexes=new_mutexes,
-                   init=new_init, goal=new_goal, operators=new_operators, axioms=new_axioms, metric=new_metric)
+                   init=new_init, goal=new_goal, operators=new_operators, axioms=new_axioms, metric=True)
 
     # Remove unreachable facts and useless variables using FD code
     filter_unreachable_propositions(new_task)
