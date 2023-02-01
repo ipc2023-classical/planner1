@@ -149,20 +149,10 @@ def parse_task(task_file):
             for _ in range(num_effects):
                 cond_effects = []
                 effect_information = sas_task.readline().strip().split()
-                num_cond_effects = int(effect_information[0])
-
-                if num_cond_effects < 1:
-                    # No effect conditions
-                    var_number, old_val, new_val = effect_information[1:]
-                else:
-                    # When there are effect conditions, 3rd to last position is var affected, followed by pre and post
-                    var_number, old_val, new_val = effect_information[-3:]
-                    # From 2nd to 4th to last position are the effect conditions
-                    cond_effects = [int(elem) for elem in effect_information[1:-3]]
-                    cond_effects = iter(cond_effects)
-                    cond_effects = list(zip(cond_effects, cond_effects))
-
-                effects.append((int(var_number), int(old_val), int(new_val), cond_effects))
+                effect_information = [int(x) for x in effect_information]
+                num_cond_effects, *cond_effects, var_number, old_val, new_val = effect_information
+                cond_effects = list(zip(cond_effects[0::2], cond_effects[1::2]))
+                effects.append((var_number, old_val, new_val, cond_effects))
 
             cost = get_next_int()
             current_line = get_next_line()

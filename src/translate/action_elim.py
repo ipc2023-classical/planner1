@@ -263,10 +263,10 @@ def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ord
 
         # Might not need to check if prevail is relevant -- was set as relevant before
         new_prev = [(var, vars_vals_map[var][val]) for var, val in op.prevail if is_fact_relevant[var][val]]
-        new_pre_post = [(var, old_val if old_val == -1 else vars_vals_map[var][old_val], \
-                        vars_vals_map[var][new_val] if is_fact_relevant[var][new_val] else variables.ranges[var] - 1, \
-                        [(cond_var, vars_vals_map[cond_var][cond_val] if is_fact_relevant[cond_var][cond_val] else variables.ranges[cond_var] -1) \
-                        for cond_var, cond_val in cond]) \
+        new_pre_post = [(var, old_val if old_val == -1 else vars_vals_map[var][old_val],
+                        vars_vals_map[var][new_val] if is_fact_relevant[var][new_val] else variables.ranges[var] - 1,
+                        [(cond_var, vars_vals_map[cond_var][cond_val] if is_fact_relevant[cond_var][cond_val] else variables.ranges[cond_var] -1)
+                        for cond_var, cond_val in cond])
                         for var, old_val, new_val, cond in op.pre_post]
         # Add ordered constraint pre_post
         if ordered:
