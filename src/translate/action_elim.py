@@ -30,8 +30,11 @@ from sas_tasks import SASTask, SASVariables, SASOperator, SASInit, SASGoal, SASA
 from simplify import filter_unreachable_propositions
 from variable_order import find_and_apply_variable_order
 
+# Type of reduction
 MR  = 'MR'
 MLR = 'MLR'
+# Macro-operator string
+MACRO_OP_STRING = " triv-nec-macro "
 
 # Clean domains as proposed by Jendrik (I think)
 def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal, enhanced_fix_point, enhanced_unnecessary, use_macro_ops):
@@ -43,6 +46,10 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
     triv_nec = [False] * len(plan)
     triv_unnec = [False] * len(plan)
     fact_achievers = []
+
+    # Use original operator costs
+    use_action_costs = reduction == MR and sas_task.metric
+
     if ordered and enhanced:
         # Find triv. neccessary actions. Operators have same order as original plan!
         triv_nec, fact_achievers = find_triv_nec_actions(sas_task.init, sas_task.goal, sas_task.variables, new_operators, enhanced_fix_point)
@@ -51,7 +58,7 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
 
         # Create macro operators from triv. nec. actions streaks
         if use_macro_ops:
-            new_operators = process_macro_operators(new_operators, triv_nec, triv_unnec)
+            new_operators = process_macro_operators(new_operators, triv_nec, triv_unnec, use_action_costs)
             print(f"Number of op withtout macro-ops: {len(plan)}\nNumb of ops with macros: {len(new_operators)}")
             plan_with_macros = new_operators
 
@@ -60,10 +67,6 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
 
     # Prune domains of variables to only contain relevant facts
     new_variables, vars_vals_map = prune_irrelevant_domain_values(sas_task.variables, relevant_facts, new_operators, ordered)
-
-    # We need action costs to maintain order of operators or if we want minimal reduction
-    # For MLR we do not need costs if permutations are allowed
-    use_action_costs = reduction == MR and sas_task.metric
 
     # Map operators variable values to new domains
     new_operators = process_operators(new_operators, relevant_facts, vars_vals_map, new_variables, ordered, use_action_costs, triv_nec, triv_unnec)
@@ -107,12 +110,9 @@ def get_operators_from_plan(operators, plan, operator_name_to_index, ordered):
 
 # Given information about triv. nec. actions, create macro operators for streaks of consecutive triv. nec. actions in plan
 # Only makes sense when maintaining order of actions in input plan
-def process_macro_operators(plan, triv_nec, triv_unnec):
+def process_macro_operators(plan, triv_nec, triv_unnec, use_op_cost):
     # Number of operators composing current macro operator
     op_count = 0
-
-    # Macro-operator string
-    MACRO_OP_STRING = " triv-nec-macro "
 
     # Prevail and pre_post of current macro operator
     # Should we use lists for this?
@@ -156,7 +156,7 @@ def process_macro_operators(plan, triv_nec, triv_unnec):
                     current_pre_post[var] = (var, old_val, new_val, cond_effects)
 
             new_name += f"{MACRO_OP_STRING}{op.name.lstrip('(').rstrip(')')}"
-            current_cost += op.cost
+            current_cost += op.cost if use_op_cost else 1
             op_count += 1
         else:
             # If macro operator was created
@@ -277,7 +277,7 @@ def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ord
 
         # For MLR we need op_cost of 1 and skip actions of cost=0
         # For MR we need to maintain the operators' original cost
-        op_cost = op.cost if use_costs else 1
+        op_cost = op.cost if use_costs or op.name.startswith(f"({MACRO_OP_STRING}") else 1
         processed_operators.append(SASOperator(name=op.name, prevail=new_prev, pre_post=new_pre_post, cost=op_cost))
 
     return processed_operators
