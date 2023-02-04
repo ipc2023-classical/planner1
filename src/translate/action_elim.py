@@ -162,6 +162,7 @@ def process_macro_operators(plan, triv_nec, triv_unnec, use_op_cost):
             # If macro operator was created
             if op_count > 1:
                 new_operators.append(SASOperator(f"({new_name})", list(current_prev.values()), list(current_pre_post.values()), current_cost))
+                new_operators[-1].is_macro = True
                 current_prev.clear()
                 current_pre_post.clear()
                 new_name = ""
@@ -183,13 +184,12 @@ def process_macro_operators(plan, triv_nec, triv_unnec, use_op_cost):
 
     if current_pre_post:
         new_operators.append(SASOperator(f"({new_name})", list(current_prev.values()), list(current_pre_post.values()), current_cost))
+        new_operators[-1].is_macro = True
         new_triv_nec.append(True)
         new_triv_unnec.append(False)
 
     triv_nec[:] = new_triv_nec
     triv_unnec[:] = new_triv_unnec
-
-    print(f"Number of triv. unnec. actions: {sum(1 for elem in triv_unnec if elem)}")
 
     return new_operators
 
@@ -277,7 +277,7 @@ def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ord
 
         # For MLR we need op_cost of 1 and skip actions of cost=0
         # For MR we need to maintain the operators' original cost
-        op_cost = op.cost if use_costs or op.name.startswith(f"({MACRO_OP_STRING}") else 1
+        op_cost = op.cost if use_costs or getattr(op, 'is_macro', False) else 1
         processed_operators.append(SASOperator(name=op.name, prevail=new_prev, pre_post=new_pre_post, cost=op_cost))
 
     return processed_operators
