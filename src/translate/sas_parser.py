@@ -14,6 +14,8 @@ import sys, os
 from sas_tasks import SASTask, SASVariables, SASOperator, SASInit, SASGoal, SASAxiom, SASMutexGroup
 import subprocess
 
+DEBUG = True
+
 def parse_task(task_file):
     variables = []
     domains = []
@@ -145,10 +147,12 @@ def parse_task(task_file):
             effects = []
             num_effects = get_next_int()
             for _ in range(num_effects):
-                num_cond_effects, var_number, old_val, new_val = sas_task.readline().strip().split()
-                if int(num_cond_effects) > 0:
-                    sys.exit("Conditional effects not supported.")
-                effects.append((int(var_number), int(old_val), int(new_val), []))
+                cond_effects = []
+                effect_information = sas_task.readline().strip().split()
+                effect_information = [int(x) for x in effect_information]
+                num_cond_effects, *cond_effects, var_number, old_val, new_val = effect_information
+                cond_effects = list(zip(cond_effects[0::2], cond_effects[1::2]))
+                effects.append((var_number, old_val, new_val, cond_effects))
 
             cost = get_next_int()
             current_line = get_next_line()
@@ -183,16 +187,22 @@ def parse_task(task_file):
 
             axioms.append(SASAxiom(condition=conditions, effect=effect))
 
-    # Verify that the read task is equal to original file
-    task = SASTask(variables=variables, mutexes=mutex_groups, init=init_state, goal=goal, operators=operators, axioms=axioms, metric=metric)
-    verify_file = task_file + ".verify-contents.sas"
-    with open(verify_file, mode='w') as output_file:
-        task.output(stream=output_file)
 
-    # Some trailing whitespaces and empty lines might mess with filecmp, so now using this.
-    # Did not find a direct way to use filecmp while ignoring trailing whtiespaces and empty lines.
-    are_different = subprocess.check_output(['diff', '-ZB', task_file, verify_file]).decode('utf-8')
-    assert not are_different, "Read task is not equal to input task."
-    os.remove(verify_file)
+    # Verify that the read task is equal to original file
+    if DEBUG:
+        task = SASTask(variables=variables, mutexes=mutex_groups, init=init_state, goal=goal, operators=operators, axioms=axioms, metric=metric)
+        verify_file = task_file + ".verify-contents.sas"
+        with open(verify_file, mode='w') as output_file:
+            task.output(stream=output_file)
+
+        try:
+            # Some trailing whitespaces and empty lines might mess with filecmp, so now using this.
+            # Did not find a direct way to use filecmp while ignoring trailing whtiespaces and empty lines.
+            are_different = subprocess.check_output(['diff', '-ZB', task_file, verify_file]).decode('utf-8')
+        except subprocess.CalledProcessError as e:
+            are_different = True
+        assert not are_different, "Read task is not equal to input task."
+
+        os.remove(verify_file)
 
     return SASTask(variables=variables, mutexes=mutex_groups, init=init_state, goal=goal, operators=operators, axioms=axioms, metric=metric), operator_name_to_index
