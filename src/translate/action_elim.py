@@ -23,12 +23,14 @@ import argparse
 import os.path
 import sys
 from time import process_time
+from math import inf, ceil
 
 from plan_parser import parse_plan
 from sas_parser import parse_task
 from sas_tasks import SASTask, SASVariables, SASOperator, SASInit, SASGoal, SASAxiom, SASMutexGroup
 from simplify import filter_unreachable_propositions
 from variable_order import find_and_apply_variable_order
+
 
 # Type of reduction
 MR  = 'MR'
@@ -37,7 +39,7 @@ MLR = 'MLR'
 MACRO_OP_STRING = " triv-nec-macro "
 
 # Clean domains as proposed by Jendrik (I think)
-def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal, enhanced_fix_point, enhanced_unnecessary, use_macro_ops):
+def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal, enhanced_fix_point, enhanced_unnecessary, use_macro_ops, zero_cost_ops):
     # Process operators. Later on, variable to maintain order of actions will be var_(n + 1) (n=num vars originally)
     print("Plan length:", len(plan))
     print("Unique operators in plan:", len(set(plan)))
@@ -49,6 +51,16 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
 
     # Use original operator costs
     use_action_costs = reduction == MR and sas_task.metric
+
+    # Deal with zero cost actions if specified
+    if reduction == MR and zero_cost_ops:
+        mult_factor = compute_mult_factor(new_operators)
+        if mult_factor > 1:
+            for op in new_operators:
+                if op.cost == 0:
+                    op.cost = 1
+                else:
+                    op.cost *= mult_factor
 
     if ordered and enhanced:
         # Find triv. neccessary actions. Operators have same order as original plan!
@@ -97,6 +109,7 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
 
     return new_task
 
+
 def get_operators_from_plan(operators, plan, operator_name_to_index, ordered):
     if ordered:
         # Ordered tasks create a different operator for each operator in the plan
@@ -107,6 +120,24 @@ def get_operators_from_plan(operators, plan, operator_name_to_index, ordered):
         # added.add(op) is only used for its' side effects.
         # set.add(x) always returns None so it doesn't affect the condition
         return [operators[operator_name_to_index[op]] for op in plan if not (op in added or added.add(op))]
+
+
+def compute_mult_factor(new_operators):
+    # Finds factor a to multiply cost of non-zero cost ops, so zero cost ops can be set to 1.
+    # Must comply with a * min_cost > m
+    # Mult. factor is computed as a = cei((m/min_cost) + eps))
+    # m is number of zero cost operators, min_cost is smallest op cost larger than 0 and eps an arbitrarily small number
+    eps = 0.1
+    zero_cost_ops = 0
+    min_cost = inf
+    for op in new_operators:
+        if op.cost == 0:
+            zero_cost_ops += 1
+        else:
+            min_cost = min(min_cost, op.cost)
+
+    return ceil((zero_cost_ops / min_cost) + eps)
+
 
 # Given information about triv. nec. actions, create macro operators for streaks of consecutive triv. nec. actions in plan
 # Only makes sense when maintaining order of actions in input plan
@@ -212,6 +243,7 @@ def find_relevant_facts(sas_task, operators, operator_name_to_index):
 
     return is_fact_relevant
 
+
 def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
     # For each var, store value mapping to new domain
     vars_new_vals_map = [[-1] * domain_size for domain_size in variables.ranges]
@@ -249,6 +281,7 @@ def prune_irrelevant_domain_values(variables, is_fact_relevant, plan, ordered):
     return SASVariables(ranges=new_ranges, axiom_layers=new_axiom_layers, value_names=new_value_names)\
            , vars_new_vals_map
 
+
 def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ordered, use_costs, triv_nec, triv_unnec):
     processed_operators = []
     # Variable to maintain order is ALWAYS the last variable
@@ -282,6 +315,7 @@ def process_operators(operators, is_fact_relevant, vars_vals_map, variables, ord
 
     return processed_operators
 
+
 def process_init(init, vars_val_map, is_fact_relevant, variables, ordered):
     new_init_values = []
     for var, val in enumerate(init.values):
@@ -297,6 +331,7 @@ def process_init(init, vars_val_map, is_fact_relevant, variables, ordered):
 
     return SASInit(values=new_init_values)
 
+
 def process_mutex_groups(mutex_groups, vars_val_map, is_fact_relevant):
     new_groups = []
     for group in mutex_groups:
@@ -306,9 +341,11 @@ def process_mutex_groups(mutex_groups, vars_val_map, is_fact_relevant):
 
     return new_groups
 
+
 def process_axioms(axioms):
     # TODO use axioms!
     return []
+
 
 # With a task and a plan, finds trivially necessary actions in the plan. (related to landmarks)
 # When solving MR and MLR (action order maintained), trivially necessary actions are those that cannot be skipped.
@@ -373,6 +410,7 @@ def find_triv_nec_actions(init, goal, variables, plan, reach_fix_point):
     print(f"Number of triv. nec. actions: {sum(1 for elem in triv_nec if elem)}")
     return triv_nec, fact_achievers
 
+
 # When a new triv. nec. action was found, update the fact achievers
 # Using prepost the triv. nec. operator, change until when each achiever
 # is actually an achiever.
@@ -388,6 +426,7 @@ def update_achievers(triv_nec_op_index, triv_nec_op, fact_achievers):
                     break
                 # Else, update the last index in which this operator is an achiever for this var=val
                 achiever[1] = min(triv_nec_op_index, achiever[1])
+
 
 # Finds triv. unnec. actions.
 def find_triv_unnec_actions(init, goal, variables, plan, triv_nec, fact_achievers):
@@ -439,6 +478,7 @@ def find_triv_unnec_actions(init, goal, variables, plan, triv_nec, fact_achiever
 
     return triv_unnec
 
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawTextHelpFormatter)
     required_named = parser.add_argument_group('required named arguments')
@@ -454,6 +494,8 @@ def main():
     # Remove -f option for simplicity. Might want to add this again later
     # parser.add_argument('-f', '--file', help='Output file where reformulated SAS+ will be stored',type=str,default='minimal-reduction.sas')
     parser.add_argument('-d', '--directory', help='Output directory',type=str, default='.')
+    parser.add_argument('-z', '--zero-cost-actions', help='Add a cost to zero cost actions to guarantee plan found with MR is perfectly justified', action='store_true', default=False)
+
     options = parser.parse_args()
     options.file = 'action-elimination.sas'
 
@@ -471,13 +513,15 @@ def main():
     create_task_time = process_time()
     new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, \
                                        options.enhanced, options.reduction, options.add_pos_to_goal, \
-                                       options.enhanced_fix_point, options.enhanced_unnecessary,\
-                                       options.macro_operators)
+                                       options.enhanced_fix_point, options.enhanced_unnecessary, \
+                                       options.macro_operators, options.zero_cost_actions)
 
     with open(os.path.join(options.directory, options.file), mode='w') as output_file:
         new_task.output(stream=output_file)
 
     create_task_time = process_time() - create_task_time
     print(f"Create AE task time: {create_task_time:.3f}")
+
+
 if __name__ == '__main__':
     main()
