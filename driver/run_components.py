@@ -238,7 +238,6 @@ def run_eliminate_actions(args):
     # Add found plan to manager...
     plan_manager.process_new_plans()
     old_plan_cost = plan_manager.get_next_portfolio_cost_bound()
-    plan = plan_manager.get_existing_plans()
 
     # Store plan file in not definitive file before filtering actions
     unfiltered_plan_file = "plan_with_skip_actions"
