@@ -39,7 +39,7 @@ MLR = 'MLR'
 MACRO_OP_STRING = " triv-nec-macro "
 
 # Clean domains as proposed by Jendrik (I think)
-def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal, enhanced_fix_point, enhanced_unnecessary, use_macro_ops, zero_cost_ops):
+def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal, enhanced_fix_point, enhanced_unnecessary, use_macro_ops, scale_costs):
     # Process operators. Later on, variable to maintain order of actions will be var_(n + 1) (n=num vars originally)
     print("Plan length:", len(plan))
     print("Unique operators in plan:", len(set(plan)))
@@ -53,9 +53,10 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
     use_action_costs = reduction == MR and sas_task.metric
 
     # Deal with zero cost actions if specified
-    if reduction == MR and zero_cost_ops:
-        mult_factor = compute_mult_factor(new_operators)
-        if mult_factor > 1:
+    if reduction == MR and scale_costs:
+        mult_factor, num_zero_cost_ops = compute_mult_factor(new_operators)
+        assert mult_factor >= 1
+        if num_zero_cost_ops > 0:
             for op in new_operators:
                 if op.cost == 0:
                     op.cost = 1
@@ -127,16 +128,16 @@ def compute_mult_factor(new_operators):
     # Must comply with a * min_cost > m
     # Mult. factor is computed as a = cei((m/min_cost) + eps))
     # m is number of zero cost operators, min_cost is smallest op cost larger than 0 and eps an arbitrarily small number
-    eps = 0.1
-    zero_cost_ops = 0
-    min_cost = inf
+    eps = 0.001
+    num_zero_cost_ops = 0
+    min_positive_cost = inf
     for op in new_operators:
         if op.cost == 0:
-            zero_cost_ops += 1
+            num_zero_cost_ops += 1
         else:
-            min_cost = min(min_cost, op.cost)
+            min_positive_cost = min(min_positive_cost, op.cost)
 
-    return ceil((zero_cost_ops / min_cost) + eps)
+    return ceil((num_zero_cost_ops / min_positive_cost) + eps), num_zero_cost_ops
 
 
 # Given information about triv. nec. actions, create macro operators for streaks of consecutive triv. nec. actions in plan
@@ -484,17 +485,17 @@ def main():
     required_named = parser.add_argument_group('required named arguments')
     required_named.add_argument('-t', '--task', help='Path to task file in SAS+ format.',type=str, required=True)
     required_named.add_argument('-p', '--plan', help='Path to plan file.', type=str, required=True)
-    parser.add_argument('-s', '--subsequence', help='Compiled task must guarantee maintaining order of original actions', action='store_true', default=False)
-    parser.add_argument('-e', '--enhanced', help='Compiled task only creates skip actions for skippable actions', action='store_true', default=False)
-    parser.add_argument('-m', '--macro-operators', help='Compiled task only creates macro operators for streaks of triv. nec. actions', action='store_true', default=False)
-    parser.add_argument('-eu', '--enhanced-unnecessary', help='Compiled task only includes actions that are not trivially unnecessary', action='store_true', default=False)
-    parser.add_argument('-pg', '--add-pos-to-goal', help='Add position variable to goals', action='store_true', default=False)
-    parser.add_argument('-fp', '--enhanced-fix-point', help='Iteratively find triv. nec. actions until a fixpoint is reached', action='store_true', default=False)
-    parser.add_argument('-r', '--reduction', help='MR or MLR. MR=minimal reduction, MLR=minimal length reduction',type=str, default=MR)
+    parser.add_argument('--subsequence', help='Compiled task must guarantee maintaining order of original actions', action='store_true', default=False)
+    parser.add_argument('--enhanced', help='Compiled task only creates skip actions for skippable actions', action='store_true', default=False)
+    parser.add_argument('--macro-operators', help='Compiled task only creates macro operators for streaks of triv. nec. actions', action='store_true', default=False)
+    parser.add_argument('--enhanced-unnecessary', help='Compiled task only includes actions that are not trivially unnecessary', action='store_true', default=False)
+    parser.add_argument('--add-pos-to-goal', help='Add position variable to goals', action='store_true', default=False)
+    parser.add_argument('--enhanced-fix-point', help='Iteratively find triv. nec. actions until a fixpoint is reached', action='store_true', default=False)
+    parser.add_argument('--reduction', help='MR or MLR. MR=minimal reduction, MLR=minimal length reduction',type=str, default=MR)
     # Remove -f option for simplicity. Might want to add this again later
     # parser.add_argument('-f', '--file', help='Output file where reformulated SAS+ will be stored',type=str,default='minimal-reduction.sas')
     parser.add_argument('-d', '--directory', help='Output directory',type=str, default='.')
-    parser.add_argument('-z', '--zero-cost-actions', help='Add a cost to zero cost actions to guarantee plan found with MR is perfectly justified', action='store_true', default=False)
+    parser.add_argument('--no-cost-scaling', dest="scale_costs", help='Do not scale costs even if the input task contains zero-cost actions. Using this option means that plans found with MR might not be perfectly justified.', action='store_false', default=True)
 
     options = parser.parse_args()
     options.file = 'action-elimination.sas'
@@ -514,7 +515,7 @@ def main():
     new_task = create_action_elim_task(task, plan, operator_name_to_index_map, options.subsequence, \
                                        options.enhanced, options.reduction, options.add_pos_to_goal, \
                                        options.enhanced_fix_point, options.enhanced_unnecessary, \
-                                       options.macro_operators, options.zero_cost_actions)
+                                       options.macro_operators, options.scale_costs)
 
     with open(os.path.join(options.directory, options.file), mode='w') as output_file:
         new_task.output(stream=output_file)

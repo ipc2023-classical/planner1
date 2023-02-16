@@ -238,13 +238,17 @@ def run_eliminate_actions(args):
     # Add found plan to manager...
     plan_manager.process_new_plans()
     old_plan_cost = plan_manager.get_next_portfolio_cost_bound()
+    plan = plan_manager.get_existing_plans()
 
+    # Store plan file in not definitive file before filtering actions
+    unfiltered_plan_file = "plan_with_skip_actions"
     ae_plan_file = plan_manager._get_plan_file(len(plan_files) + 1)
+
     time_limit = limits.get_time_limit(None, args.overall_time_limit)
     memory_limit = limits.get_memory_limit(None, args.overall_memory_limit)
 
     ae_options = args.action_elimination_options
-    planner_options = ["--internal-plan-file", ae_plan_file] + args.action_elimination_planner_configuration
+    planner_options = ["--internal-plan-file", unfiltered_plan_file] + args.action_elimination_planner_configuration
 
     # Action elimination produced task file is always this one
     ae_task_file = "action-elimination.sas"
@@ -282,7 +286,8 @@ def run_eliminate_actions(args):
             return (err.returncode, False)
 
     # Remove skip actions if present in plan
-    cleaned_plan, plan_cost = parse_plan_filter_skip_actions(ae_plan_file)
+    cleaned_plan, plan_cost = parse_plan_filter_skip_actions(unfiltered_plan_file)
+    os.remove(unfiltered_plan_file)
     cleaned_plan.append("; cost = %d (%s)" % (plan_cost, "general cost" \
                         if plan_manager.get_problem_type() == "general cost" else "unit cost"))
 
@@ -294,7 +299,5 @@ def run_eliminate_actions(args):
         with open(ae_plan_file, 'w') as found_plan:
             found_plan.write("\n".join(cleaned_plan))
             found_plan.write("\n")
-    else:
-        os.remove(ae_plan_file)
 
     return 0, True
