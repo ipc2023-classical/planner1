@@ -14,9 +14,8 @@ import sys, os
 from sas_tasks import SASTask, SASVariables, SASOperator, SASInit, SASGoal, SASAxiom, SASMutexGroup
 import subprocess
 
-DEBUG = True
 
-def parse_task(task_file):
+def parse_task(task_file, verify_parsed_task=False):
     variables = []
     domains = []
     mutex_groups = []
@@ -189,7 +188,7 @@ def parse_task(task_file):
 
 
     # Verify that the read task is equal to original file
-    if DEBUG:
+    if verify_parsed_task:
         task = SASTask(variables=variables, mutexes=mutex_groups, init=init_state, goal=goal, operators=operators, axioms=axioms, metric=metric)
         verify_file = task_file + ".verify-contents.sas"
         with open(verify_file, mode='w') as output_file:

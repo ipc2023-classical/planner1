@@ -20,6 +20,7 @@ Allow reorder of actions in original plan call string:
 """
 
 import argparse
+import json
 import os.path
 import sys
 from time import process_time
@@ -37,6 +38,8 @@ MR  = 'MR'
 MLR = 'MLR'
 # Macro-operator string
 MACRO_OP_STRING = " triv-nec-macro "
+# Cost scalin file
+ORGINAL_OP_COSTS_FILE = 'orginal-op-costs.txt'
 
 # Clean domains as proposed by Jendrik (I think)
 def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal, enhanced_fix_point, enhanced_unnecessary, use_macro_ops, scale_costs):
@@ -51,17 +54,22 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
 
     # Use original operator costs
     use_action_costs = reduction == MR and sas_task.metric
-
     # Deal with zero cost actions if specified
     if reduction == MR and scale_costs:
         mult_factor, num_zero_cost_ops = compute_mult_factor(new_operators)
+        original_op_cost_map = {}
         assert mult_factor >= 1
         if num_zero_cost_ops > 0:
             for op in new_operators:
+                original_op_cost_map[op.name] = op.cost
                 if op.cost == 0:
                     op.cost = 1
                 else:
                     op.cost *= mult_factor
+        # Store original operator costs
+        with open(ORGINAL_OP_COSTS_FILE, 'w') as original_costs_file:
+            original_costs_file.write(f"{num_zero_cost_ops},{mult_factor}\n")
+            original_costs_file.write(json.dumps(original_op_cost_map))
 
     if ordered and enhanced:
         # Find triv. neccessary actions. Operators have same order as original plan!
@@ -496,7 +504,6 @@ def main():
     # parser.add_argument('-f', '--file', help='Output file where reformulated SAS+ will be stored',type=str,default='minimal-reduction.sas')
     parser.add_argument('-d', '--directory', help='Output directory',type=str, default='.')
     parser.add_argument('--no-cost-scaling', dest="scale_costs", help='Do not scale costs even if the input task contains zero-cost actions. Using this option means that plans found with MR might not be perfectly justified.', action='store_false', default=True)
-
     options = parser.parse_args()
     options.file = 'action-elimination.sas'
 

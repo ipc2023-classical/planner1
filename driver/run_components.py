@@ -1,4 +1,5 @@
 import errno
+import json
 import logging
 import os.path
 import shutil
@@ -222,6 +223,15 @@ def run_eliminate_actions(args):
         total_cost = int(re.match(r"; cost = (\d+) \(.+ cost\)", lines[-1]).group(1))
         return plan, total_cost
 
+    def parse_original_action_costs():
+        ORGINAL_OP_COSTS_FILE = 'orginal-op-costs.txt'
+        with open(ORGINAL_OP_COSTS_FILE, 'r') as op_cost_file:
+            num_zero_cost_ops, _ = op_cost_file.readline().split(',')
+            original_cost_map = {}
+            if num_zero_cost_ops != "0":
+                original_cost_map = json.loads(op_cost_file.read())
+        return num_zero_cost_ops, original_cost_map
+
     logging.info("Eliminate actions")
 
     plan_manager = PlanManager(
@@ -286,6 +296,13 @@ def run_eliminate_actions(args):
 
     # Remove skip actions if present in plan
     cleaned_plan, plan_cost = parse_plan_filter_skip_actions(unfiltered_plan_file)
+
+    # If cost scaling was done, we need to map back action costs
+    if '--no-cost-scaling' not in ae_options:
+        num_zero_cost_ops, original_op_costs_map = parse_original_action_costs()
+        if num_zero_cost_ops != "0":
+            plan_cost = sum([original_op_costs_map[op] for op in cleaned_plan])
+
     os.remove(unfiltered_plan_file)
     cleaned_plan.append("; cost = %d (%s)" % (plan_cost, "general cost" \
                         if plan_manager.get_problem_type() == "general cost" else "unit cost"))
