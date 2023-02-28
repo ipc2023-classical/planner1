@@ -25,6 +25,7 @@ import os.path
 import sys
 from time import process_time
 from math import inf, ceil
+from copy import deepcopy
 
 from plan_parser import parse_plan
 from sas_parser import parse_task
@@ -39,7 +40,7 @@ MLR = 'MLR'
 # Macro-operator string
 MACRO_OP_STRING = " triv-nec-macro "
 # Cost scalin file
-ORGINAL_OP_COSTS_FILE = 'orginal-op-costs.txt'
+ORGINAL_OP_COSTS_FILE = 'original-op-costs.txt'
 
 # Clean domains as proposed by Jendrik (I think)
 def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enhanced, reduction, add_pos_to_goal, enhanced_fix_point, enhanced_unnecessary, use_macro_ops, scale_costs):
@@ -61,15 +62,21 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
         assert mult_factor >= 1
         if num_zero_cost_ops > 0:
             for op in new_operators:
-                original_op_cost_map[op.name] = op.cost
                 if op.cost == 0:
                     op.cost = 1
                 else:
                     op.cost *= mult_factor
+
+        # Map of all cost scaling information
+        cost_scaling_info = {
+            "num_zero_cost_operators": num_zero_cost_ops,
+            "cost_scaling_factor": mult_factor,
+            "original_costs": original_op_cost_map
+        }
+
         # Store original operator costs
         with open(ORGINAL_OP_COSTS_FILE, 'w') as original_costs_file:
-            original_costs_file.write(f"{num_zero_cost_ops},{mult_factor}\n")
-            original_costs_file.write(json.dumps(original_op_cost_map))
+            original_costs_file.write(json.dumps(cost_scaling_info))
 
     if ordered and enhanced:
         # Find triv. neccessary actions. Operators have same order as original plan!
@@ -122,7 +129,7 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
 def get_operators_from_plan(operators, plan, operator_name_to_index, ordered):
     if ordered:
         # Ordered tasks create a different operator for each operator in the plan
-        return [operators[operator_name_to_index[op]] for op in plan]
+        return [deepcopy(operators[operator_name_to_index[op]]) for op in plan]
     else:
         # Unordered tasks create a different operator for each unique operator in the plan
         added = set()
