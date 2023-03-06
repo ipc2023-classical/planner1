@@ -62,6 +62,7 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
         assert mult_factor >= 1
         if num_zero_cost_ops > 0:
             for op in new_operators:
+                original_op_cost_map[op.name] = op.cost
                 if op.cost == 0:
                     op.cost = 1
                 else:
