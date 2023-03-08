@@ -38,7 +38,7 @@ from variable_order import find_and_apply_variable_order
 MR  = 'MR'
 MLR = 'MLR'
 # Macro-operator string
-MACRO_OP_STRING = " triv-nec-macro "
+MACRO_OP_STRING = "-triv-nec-macro-"
 # Cost scalin file
 ORGINAL_OP_COSTS_FILE = 'original-op-costs.txt'
 

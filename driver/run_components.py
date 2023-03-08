@@ -209,7 +209,7 @@ def run_validate(args):
 
 def run_eliminate_actions(args):
     def parse_plan_filter_skip_actions(planfile):
-        MACRO_OP_STRING = "triv-nec-macro"
+        MACRO_OP_STRING = "-triv-nec-macro-"
         SKIP_OP_STRING = "(skip-action plan-pos-"
         with open(planfile) as stream:
             lines = stream.readlines()
@@ -217,7 +217,7 @@ def run_eliminate_actions(args):
         for op in lines[:-1]:
             if op.startswith("(" + MACRO_OP_STRING):
                 # Kind of messy, might refactor
-                plan += list(map(lambda x: f"({x.strip().lstrip('(').rstrip(')').strip()})", op.split(MACRO_OP_STRING)))[1:]
+                plan += list(map(lambda x: f"({x.lstrip('(')}".strip("\n").rstrip(')') + ')', op.split(MACRO_OP_STRING)))[1:]
             elif not op.startswith(SKIP_OP_STRING):
                 plan.append(op.strip())
         total_cost = int(re.match(r"; cost = (\d+) \(.+ cost\)", lines[-1]).group(1))
