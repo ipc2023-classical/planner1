@@ -254,9 +254,11 @@ def find_relevant_facts(sas_task, operators, operator_name_to_index):
         for var, val in op.prevail:
             is_fact_relevant[var][val] = True
 
-        for var, old_val, _, _ in op.pre_post:
+        for var, old_val, _, conditions in op.pre_post:
             if old_val > -1:
                 is_fact_relevant[var][old_val] = True
+            for cond_var, cond_val in conditions:
+                is_fact_relevant[cond_var][cond_val] = True
 
     return is_fact_relevant
 
@@ -433,16 +435,17 @@ def find_triv_nec_actions(init, goal, variables, plan, reach_fix_point):
 # is actually an achiever.
 def update_achievers(triv_nec_op_index, triv_nec_op, fact_achievers):
     # For each variable in the pre_post
-    for var, _, _, _ in triv_nec_op.pre_post:
-        # For each val of the var
-        for var_value in fact_achievers[var]:
-            # For each achiever of the val
-            for achiever in var_value:
-                # If the op. index is greater than operator used to update, break (ordered list)
-                if achiever[0] >= triv_nec_op_index:
-                    break
-                # Else, update the last index in which this operator is an achiever for this var=val
-                achiever[1] = min(triv_nec_op_index, achiever[1])
+    for var, _, _, eff_conditons in triv_nec_op.pre_post:
+        if not eff_conditons:
+            # For each val of the var
+            for var_value in fact_achievers[var]:
+                # For each achiever of the val
+                for achiever in var_value:
+                    # If the op. index is greater than operator used to update, break (ordered list)
+                    if achiever[0] >= triv_nec_op_index:
+                        break
+                    # Else, update the last index in which this operator is an achiever for this var=val
+                    achiever[1] = min(triv_nec_op_index, achiever[1])
 
 
 # Finds triv. unnec. actions.
