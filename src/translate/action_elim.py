@@ -159,6 +159,12 @@ def compute_mult_factor(new_operators):
 # Given information about triv. nec. actions, create macro operators for streaks of consecutive triv. nec. actions in plan
 # Only makes sense when maintaining order of actions in input plan
 def process_macro_operators(plan, triv_nec, triv_unnec, use_op_cost):
+    def has_eff_cond(op):
+        for var, _, _, eff_cond in op.pre_post:
+            if eff_cond:
+                return True
+        return False
+
     # Number of operators composing current macro operator
     op_count = 0
 
@@ -177,7 +183,7 @@ def process_macro_operators(plan, triv_nec, triv_unnec, use_op_cost):
     new_triv_unnec = []
 
     for index, op in enumerate(plan):
-        if triv_nec[index]:
+        if triv_nec[index] and not has_eff_cond(plan[index]):
             # If no streak of triv. nec. actions, do not process operator for new macro op.
             if op_count < 1 and not triv_nec[index + 1]:
                 op_count = 1
