@@ -392,60 +392,88 @@ def find_triv_nec_actions(init, goal, variables, plan, reach_fix_point):
     # Copy the operators
     extended_plan = plan[:]
     extended_plan.append(virtual_goal_action)
-    triv_nec = [False for _ in extended_plan]
-    triv_nec[-1] = True
+
+    # List to store what operators are triv. nec. If an op. is triv. nec., is because one of it's effects is needed
+    # Here we keep track of what effects (var, new_val) make each operator triv. nec.
+    # An empty means the operator is not triv. nec.
+    triv_nec = [set() for _ in extended_plan]
+
+    # The virtual goal is triv. nec., but by definition and not because of it's effects
+    triv_nec[-1] = (set([-1]))
     is_fix_point = False
 
     while not is_fix_point:
         is_fix_point = True
         # Check, in reverse order, for trivially nec actions
         for op_index in range(len(extended_plan) - 1, -1, -1):
-            # If current act is triv. nec, its' preconds are nec.domain
+            # If current act is triv. nec, its' preconds are neccessary
             if triv_nec[op_index]:
                 current_op = extended_plan[op_index]
                 for var, val in current_op.prevail:
                     # Find achievers for current precondition at current plan step.
                     current_achievers = [achiever[0] for achiever in fact_achievers[var][val] if achiever[0] < op_index and achiever[1] >= op_index]
-                    if len(current_achievers) < 2:
-                        # If the achiever is not the initial state, new triv. nec. action
-                        if current_achievers[0] > -1 and not triv_nec[current_achievers[0]]:
-                            triv_nec[current_achievers[0]] = True
-                            if reach_fix_point:
-                                update_achievers(current_achievers[0], extended_plan[current_achievers[0]], fact_achievers)
-                                is_fix_point = False
 
-                for var, val, _, _ in current_op.pre_post:
-                    # If one pre has only one achiever that is not the initial state, that achiever is nec!
-                    current_achievers = [achiever[0] for achiever in fact_achievers[var][val] if achiever[0] < op_index and achiever[1] >= op_index]
-                    if val > -1 and len(current_achievers) < 2:
-                        # If the achiever is not the initial state, new triv. nec. action
-                        if current_achievers[0] > -1 and not triv_nec[current_achievers[0]]:
-                            triv_nec[current_achievers[0]] = True
-                            if reach_fix_point:
-                                update_achievers(current_achievers[0], extended_plan[current_achievers[0]], fact_achievers)
+                    # If the op. is triv nec, update the fact achievers information
+                    if check_and_update_triv_nec(var, val, current_achievers, triv_nec) and reach_fix_point:
+                        update_achievers(current_achievers[0], extended_plan[current_achievers[0]], fact_achievers, triv_nec)
+                        is_fix_point = False
+
+                # Now checking for preconditions in pre_post.
+                for var, val, new_val, eff_conditions in current_op.pre_post:
+                    # If there are no effect conditions, the pre is necessary
+                    # If there are effect conditions and this particular effect was the reason the current op. was labeled as triv. nec
+                    # Then all it's effect conditions are necessary
+                    if not eff_conditions or (var, new_val) in triv_nec[op_index]:
+                        current_achievers = [achiever[0] for achiever in fact_achievers[var][val] if achiever[0] < op_index and achiever[1] >= op_index]
+                        if check_and_update_triv_nec(var, val, current_achievers, triv_nec) and reach_fix_point:
+                            update_achievers(current_achievers[0], extended_plan[current_achievers[0]], fact_achievers, triv_nec)
+                            is_fix_point = False
+
+                        # Check for new triv. nec. ops in the effect conditions
+                        for (cond_var, cond_val) in eff_conditions:
+                            current_achievers = [achiever[0] for achiever in fact_achievers[cond_var][cond_val] if achiever[0] < op_index and achiever[1] >= op_index]
+                            if check_and_update_triv_nec(cond_var, cond_val, current_achievers, triv_nec) and reach_fix_point:
+                                update_achievers(current_achievers[0], extended_plan[current_achievers[0]], fact_achievers, triv_nec)
                                 is_fix_point = False
 
     print(f"Trivially necessary actions time: {process_time() - init_time:.3f}")
     print(f"Number of triv. nec. actions: {sum(1 for elem in triv_nec if elem)}")
-    return triv_nec, fact_achievers
+    return [bool(elem) for elem in triv_nec], fact_achievers
 
 
 # When a new triv. nec. action was found, update the fact achievers
 # Using prepost the triv. nec. operator, change until when each achiever
 # is actually an achiever.
-def update_achievers(triv_nec_op_index, triv_nec_op, fact_achievers):
+def update_achievers(triv_nec_op_index, triv_nec_op, fact_achievers, triv_nec):
     # For each variable in the pre_post
-    for var, _, _, eff_conditons in triv_nec_op.pre_post:
-        if not eff_conditons:
+    for var, _, new_val, eff_conditons in triv_nec_op.pre_post:
+        # If there are no effect conditions, always update achiever information
+        # Otherwise, only update information if this op. was labeled as triv. nec. because of this effect
+        if not eff_conditons or (var, new_val) in triv_nec[triv_nec_op_index]:
             # For each val of the var
-            for var_value in fact_achievers[var]:
-                # For each achiever of the val
-                for achiever in var_value:
-                    # If the op. index is greater than operator used to update, break (ordered list)
-                    if achiever[0] >= triv_nec_op_index:
-                        break
-                    # Else, update the last index in which this operator is an achiever for this var=val
-                    achiever[1] = min(triv_nec_op_index, achiever[1])
+            for var_value, var_value_achievers in enumerate(fact_achievers[var]):
+                if var_value != new_val:
+                    # For each achiever of the val
+                    for achiever in var_value_achievers:
+                        # If the op. index is greater than operator used to update, break (ordered list)
+                        if achiever[0] >= triv_nec_op_index:
+                            break
+                        # Else, update the last index in which this operator is an achiever for this var=val
+                        achiever[1] = min(triv_nec_op_index, achiever[1])
+
+
+# Checks if a new triv. nec. op was discovered and adds it to the list of triv. nec. ops if it was
+def check_and_update_triv_nec(var, old_val, current_achievers, triv_nec):
+    # If the precondition is not a wildcard and there's exactly one achiever
+    if old_val > -1 and len(current_achievers) < 2:
+        # If the achiever is not the initial state
+        # And the achiever was not labeled as triv. nec. because of this fact before, update triv. nec. info
+        if current_achievers[0] > -1 and (var, old_val) not in triv_nec[current_achievers[0]]:
+            triv_nec[current_achievers[0]].add((var, old_val))
+            return True
+
+    # Op. was not idetified as triv. nec. for this fact.
+    return False
 
 
 # Finds triv. unnec. actions.
