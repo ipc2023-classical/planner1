@@ -185,7 +185,7 @@ def process_macro_operators(plan, triv_nec, triv_unnec, use_op_cost):
     for index, op in enumerate(plan):
         if triv_nec[index] and not has_eff_cond(plan[index]):
             # If no streak of triv. nec. actions, do not process operator for new macro op.
-            if op_count < 1 and not triv_nec[index + 1]:
+            if op_count < 1 and  (not triv_nec[index + 1] or (index < len(plan) - 1 and has_eff_cond(plan[index + 1]))):
                 op_count = 1
                 continue
 
