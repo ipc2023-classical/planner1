@@ -271,7 +271,8 @@ def run_eliminate_actions(args):
             time_limit=time_limit,
             memory_limit=memory_limit)
     except subprocess.CalledProcessError as err:
-        print("Error while eliminating actions.", file=sys.stderr)
+        returncodes.print_stderr(
+                f"Error while eliminating actions. Exit status {err.returncode}")
         return err.returncode, False
 
     executable = get_executable(args.build, REL_SEARCH_PATH)
@@ -289,6 +290,8 @@ def run_eliminate_actions(args):
         logging.info(f"AE planner call time: {ae_planner_call_time:3f}")
     except subprocess.CalledProcessError as err:
             assert err.returncode >= 10 or err.returncode < 0, "got returncode < 10: {}".format(err.returncode)
+            returncodes.print_stderr(
+                f"Error while running search for eliminating actions. Exit status {err.returncode}")
             return (err.returncode, False)
 
     # Remove skip actions if present in plan
