@@ -83,13 +83,11 @@ def compute_run_time(timeout, configs, pos):
     remaining_time = timeout - util.get_elapsed_time()
     print("remaining time: {}".format(remaining_time))
     relative_time = configs[pos][0]
-    # Impose no time limit for configs with a negative timeout value.
-    if relative_time < 0:
-        return remaining_time
-    remaining_relative_time = sum(config[0] for config in configs[pos:] if config[0] >= 0)
-    print("config {}: relative time {}, remaining {}".format(
-          pos, relative_time, remaining_relative_time))
-    return limits.round_time_limit(remaining_time * relative_time / remaining_relative_time)
+    remaining_relative_time = sum(config[0] for config in configs[pos:])
+    absolute_time_limit = limits.round_time_limit(remaining_time * relative_time / remaining_relative_time)
+    print("config {}: relative time {}, remaining time {}, absolute time {}".format(
+          pos, relative_time, remaining_relative_time, absolute_time_limit))
+    return absolute_time_limit
 
 
 def run_sat_config(configs, pos, search_cost_type, heuristic_cost_type,
@@ -124,7 +122,7 @@ def run_sat(configs, executable, sas_file, plan_manager, final_config,
                 configs, pos, search_cost_type, heuristic_cost_type,
                 executable, sas_file, plan_manager, timeout, memory)
             if exitcode is None:
-                return
+                continue
 
             yield exitcode
             if exitcode == returncodes.SEARCH_UNSOLVABLE:
