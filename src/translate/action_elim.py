@@ -30,7 +30,7 @@ from copy import deepcopy
 from plan_parser import parse_plan
 from sas_parser import parse_task
 from sas_tasks import SASTask, SASVariables, SASOperator, SASInit, SASGoal, SASAxiom, SASMutexGroup
-from simplify import filter_unreachable_propositions
+from simplify import TriviallySolvable, filter_unreachable_propositions
 from variable_order import find_and_apply_variable_order
 
 
@@ -120,8 +120,12 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
     new_task = SASTask(variables=new_variables, mutexes=new_mutexes,
                    init=new_init, goal=new_goal, operators=new_operators, axioms=new_axioms, metric=True)
 
-    # Remove unreachable facts and useless variables using FD code
-    filter_unreachable_propositions(new_task)
+    try:
+        # Remove unreachable facts and useless variables using FD code
+        filter_unreachable_propositions(new_task)
+    except TriviallySolvable:
+        sys.exit("Action elimination task is trivially solvable. New task will not be generated.")
+
     find_and_apply_variable_order(new_task, reorder_vars=True, filter_unimportant_vars=True)
 
     return new_task

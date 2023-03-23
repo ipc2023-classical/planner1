@@ -164,10 +164,14 @@ def parse_task(task_file, verify_parsed_task=False):
             operators.append(SASOperator(name=operator_name, prevail=[], pre_post=[], cost=cost))
             operators[-1].prevail = prevail_cond
             operators[-1].pre_post = effects
+            if operator_name in operator_name_to_index:
+                sys.exit("Multiple actions with the same name not supported by action elimination.")
             operator_name_to_index[operator_name] = operator_index
 
         # Axioms...
         num_axioms = get_next_int()
+        if num_axioms > 0:
+            sys.exit("Axioms not supported by action elimination module.")
         for _ in range(num_axioms):
             current_line = get_next_line()
             assert(current_line == 'begin_rule')
