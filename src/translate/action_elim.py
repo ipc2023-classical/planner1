@@ -115,7 +115,7 @@ def create_action_elim_task(sas_task, plan, operator_name_to_index, ordered, enh
         new_goal = SASGoal(new_goal_facts)
 
     # Map axioms
-    new_axioms = process_axioms(sas_task.axioms)
+    new_axioms = process_axioms(sas_task.axioms, new_variables, vars_vals_map, relevant_facts)
 
     new_task = SASTask(variables=new_variables, mutexes=new_mutexes,
                    init=new_init, goal=new_goal, operators=new_operators, axioms=new_axioms, metric=True)
@@ -266,6 +266,13 @@ def find_relevant_facts(sas_task, operators, operator_name_to_index):
             for cond_var, cond_val in conditions:
                 is_fact_relevant[cond_var][cond_val] = True
 
+    # All facts in axiom conditions are relevant
+    for axiom in sas_task.axioms:
+        for var, val in axiom.condition:
+            is_fact_relevant[var][val] = True
+        if axiom.effect[1] > -1:
+            is_fact_relevant[axiom.effect[0]][axiom.effect[1]] = True
+
     return is_fact_relevant
 
 
@@ -367,9 +374,21 @@ def process_mutex_groups(mutex_groups, vars_val_map, is_fact_relevant):
     return new_groups
 
 
-def process_axioms(axioms):
-    # TODO use axioms!
-    return []
+def process_axioms(axioms, variables, vars_vals_map, is_fact_relevant):
+    new_axioms = []
+    for axiom in axioms:
+        # All conditions of axioms are marked as relevant, we could skip this?
+        conditions = [(var, vars_vals_map[var][val] if is_fact_relevant[var][val] else variables.ranges[var] - 1) for var, val in axiom.condition]
+        effect_var = axiom.effect[0]
+        effect_pre = axiom.effect[1]
+        if effect_pre != -1:
+            # All conditions of axioms are marked as relevant, we could skip this?
+            effect_pre = vars_vals_map[effect_var][effect_pre] if is_fact_relevant[effect_var][effect_pre] else variables.ranges[effect_var] - 1
+        effect_pos = axiom.effect[2] if is_fact_relevant[effect_var][axiom.effect[2]] else variables.ranges[effect_var] - 1
+        effect = (effect_var, effect_pos)
+        new_axioms.append(SASAxiom(conditions, effect))
+
+    return new_axioms
 
 
 # With a task and a plan, finds trivially necessary actions in the plan. (related to landmarks)

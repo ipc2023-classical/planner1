@@ -176,7 +176,7 @@ def parse_task(task_file, verify_parsed_task=False):
             conditions = []
             for _ in range(num_cond):
                 var, val = get_next_int_pair()
-                conditions.append(var, val)
+                conditions.append((var, val))
 
             var, old_val, new_val = sas_task.readline().strip().split()
             effect = (int(var), int(old_val), int(new_val))
