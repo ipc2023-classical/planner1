@@ -55,5 +55,16 @@ Stage: run
 
 %labels
     Name        Spock
-    Description FDDS 2018 with action elimination. Removes redundant actions from each found plan.
+    Description FDSS 2018 with action elimination. Removes redundant actions from each found plan.
     Authors     Jendrik Seipp <jendrik.seipp@liu.se>, Mauricio Salerno <msalerno@pa.uc3m.es>, Raquel Fuentetaja <rfuentet@inf.uc3m.es>
+    License     GPL 3
+    Tracks      satisficing
+    SupportsDerivedPredicates                       yes
+    SupportsUniversallyQuantifiedPreconditions      yes
+    SupportsExistentiallyQuantifiedPreconditions    yes
+    SupportsUniversallyQuantifiedEffects            yes
+    SupportsNegativePreconditions                   yes
+    SupportsEqualityPreconditions                   yes
+    SupportsInequalityPreconditions                 yes
+    SupportsConditionalEffects                      yes
+    SupportsImplyPreconditions                      yes
