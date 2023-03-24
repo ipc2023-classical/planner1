@@ -55,7 +55,7 @@ Stage: run
 
 %labels
     Name        Spock
-    Description FDSS 2018 with action elimination. Removes redundant actions from each found plan.
+    Description FDSS 2018 with action elimination. Removes redundant actions from each found plan to -potentially- rapidly find a cheaper plan.
     Authors     Jendrik Seipp <jendrik.seipp@liu.se>, Mauricio Salerno <msalerno@pa.uc3m.es>, Raquel Fuentetaja <rfuentet@inf.uc3m.es>
     License     GPL 3
     Tracks      satisficing
