@@ -207,7 +207,7 @@ def run_validate(args):
     else:
         return (0, True)
 
-def run_eliminate_actions(args):
+def run_eliminate_actions(args, time_limit=None):
     def parse_plan_filter_skip_actions(planfile):
         MACRO_OP_STRING = "-triv-nec-macro-"
         SKIP_OP_STRING = "(skip-action plan-pos-"
@@ -250,7 +250,9 @@ def run_eliminate_actions(args):
     unfiltered_plan_file = "plan_with_skip_actions"
     ae_plan_file = plan_manager._get_plan_file(len(plan_files) + 1)
 
-    time_limit = limits.get_time_limit(None, args.overall_time_limit)
+    if time_limit is None:
+        time_limit = limits.get_time_limit(None, args.overall_time_limit)
+
     memory_limit = limits.get_memory_limit(None, args.overall_memory_limit)
 
     ae_options = args.action_elimination_options

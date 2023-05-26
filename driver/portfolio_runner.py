@@ -118,9 +118,12 @@ def run_sat(configs, executable, sas_file, plan_manager, final_config,
     while configs:
         configs_next_round = []
         for pos, (relative_time, args) in enumerate(configs):
+            time_for_search = compute_run_time(timeout, configs, pos)
+            start_time = util.get_elapsed_time()
             exitcode = run_sat_config(
                 configs, pos, search_cost_type, heuristic_cost_type,
                 executable, sas_file, plan_manager, timeout, memory)
+            end_time = util.get_elapsed_time()
             if exitcode is None:
                 continue
 
@@ -131,8 +134,10 @@ def run_sat(configs, executable, sas_file, plan_manager, final_config,
             if exitcode == returncodes.SUCCESS:
                 if cmd_args.portfolio_eliminate_actions:
                     # Run action elimination and process new plan
-                    run_components.run_eliminate_actions(cmd_args)
-                    plan_manager.process_new_plans()
+                    ae_time = limits.round_time_limit(time_for_search - (end_time - start_time))
+                    if ae_time > 0:
+                        run_components.run_eliminate_actions(cmd_args, ae_time)
+                        plan_manager.process_new_plans()
 
                 if plan_manager.abort_portfolio_after_first_plan():
                     return
