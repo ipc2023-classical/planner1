@@ -44,7 +44,7 @@ Stage: run
 
     pypy3 /planner/fast-downward.py --translate --search \
         --portfolio-eliminate-actions --alias seq-sat-fdss-2018 \
-        --overall-time-limit 30m --overall-memory-limit 6G \
+        --overall-time-limit 30m --search-memory-limit 6G \
         --transform-task preprocess-h2 \
         --transform-task-options h2_time_limit,300 \
         --plan-file "$PLANFILE" \
